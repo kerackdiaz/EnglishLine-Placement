@@ -1,0 +1,674 @@
+/* ====================================
+   ENGLISHLINE TEST - ESTILOS MODERNOS
+   ==================================== */
+
+/* ===== CONTENEDOR PRINCIPAL ===== */
+.englishline-form-container {
+  max-width: 900px;
+  margin: 40px auto;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  font-family: inherit;
+}
+
+/* ===== ENCABEZADO DEL FORMULARIO ===== */
+.englishline-form-header {
+  padding: 30px 40px;
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  color: white;
+  text-align: center;
+}
+
+.englishline-form-title {
+  margin: 0 0 10px 0;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.englishline-form-description {
+  margin: 0;
+  opacity: 0.9;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* ===== INDICADOR DE PASOS ===== */
+.englishline-form-steps {
+  display: flex;
+  justify-content: center;
+  margin: 0 30px;
+  padding: 25px 0;
+  position: relative;
+}
+
+.englishline-form-steps::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: #e0e0e0;
+  z-index: 1;
+}
+
+.englishline-form-step {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  background-color: white;
+  border: 2px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 15px;
+  position: relative;
+  z-index: 2;
+  transition: all 0.3s ease;
+}
+
+.englishline-form-step.active {
+  border-color: #3498db;
+  background-color: #3498db;
+  color: white;
+}
+
+.englishline-form-step.completed {
+  border-color: #2ecc71;
+  background-color: #2ecc71;
+  color: white;
+}
+
+.englishline-form-step .step-number {
+  font-weight: bold;
+}
+
+/* ===== CONTENIDO DEL FORMULARIO ===== */
+.englishline-form-content {
+  padding: 30px;
+}
+
+.englishline-form-step-content {
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.englishline-section-title {
+  font-size: 22px;
+  color: #333;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.englishline-section-description {
+  color: #666;
+  margin-bottom: 25px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* ===== PREGUNTAS ===== */
+.englishline-question {
+  margin-bottom: 25px;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.englishline-question:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+}
+
+.form-question-prompt {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 12px;
+  font-size: 16px;
+}
+
+.form-question-text {
+  font-size: 18px;
+  line-height: 1.5;
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.form-question-text.size-h1 { font-size: 26px; font-weight: bold; }
+.form-question-text.size-h2 { font-size: 22px; font-weight: bold; }
+.form-question-text.size-h3 { font-size: 18px; font-weight: bold; }
+.form-question-text.size-p { font-size: 16px; font-weight: normal; }
+
+.form-question-text.align-left { text-align: left; }
+.form-question-text.align-center { text-align: center; }
+.form-question-text.align-right { text-align: right; }
+
+/* ===== CAMPOS DE ENTRADA ===== */
+.form-question-answer input[type="text"], 
+.form-question-answer input[type="email"], 
+.form-question-answer input[type="tel"],
+.form-question-answer select,
+.form-question-answer textarea {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 15px;
+  transition: border 0.3s ease, box-shadow 0.3s ease;
+}
+
+.form-question-answer input[type="text"]:focus, 
+.form-question-answer input[type="email"]:focus, 
+.form-question-answer input[type="tel"]:focus,
+.form-question-answer select:focus,
+.form-question-answer textarea:focus {
+  border-color: #3498db;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+}
+
+/* ===== OPCIONES DE RADIO Y CHECKBOX ===== */
+.form-question-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.form-question-option {
+  position: relative;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.form-question-option input[type="radio"],
+.form-question-option input[type="checkbox"] {
+  margin-right: 10px;
+  cursor: pointer;
+  min-width: 18px;
+}
+
+.form-question-option label {
+  cursor: pointer;
+  padding-left: 5px;
+}
+
+/* ===== VERDADERO/FALSO ===== */
+.form-question-true-false .true-false-options {
+  display: flex;
+  gap: 20px;
+}
+
+/* ===== EJERCICIO CLOZE ===== */
+.form-question-cloze {
+  line-height: 2;
+  font-size: 16px;
+}
+
+.form-question-cloze input.cloze-blank {
+  width: 120px!important;
+  padding: 0px!important;
+  border: 0px solid #ddd!important;
+  border-width: 0 0 2px!important;
+  border-radius: 4px;
+  margin: 0 4px;
+  display: inline-block;
+  transition: border 0.3s ease, box-shadow 0.3s ease;
+}
+
+.form-question-cloze input.cloze-blank:focus {
+  border-width: 0 0 2px !important;
+  border-color: #3498db !important;
+  box-shadow: none !important;
+  outline: none;
+}
+
+/* ===== ELEMENTOS ORDENABLES ===== */
+.ordering-list {
+  list-style: none;
+  padding: 0;
+  margin: 15px 0;
+}
+
+.ordering-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 15px;
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 5px;
+  margin-bottom: 8px;
+  cursor: move;
+  transition: background-color 0.3s ease;
+}
+
+.ordering-item:hover {
+  background-color: #f0f7ff;
+}
+
+.ordering-item .dashicons-menu {
+  color: #999;
+  margin-right: 10px;
+  cursor: move;
+}
+
+/* ===== PISTAS ===== */
+.form-question-hint {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background-color: #fff8e1;
+  border-left: 3px solid #ffc107;
+  color: #795548;
+  font-size: 14px;
+  line-height: 1.5;
+  display: flex;
+  align-items: flex-start;
+}
+
+.form-question-hint .dashicons {
+  margin-right: 8px;
+  margin-top: 2px;
+  color: #ffc107;
+}
+
+/* ===== PREGUNTAS CON IMAGEN ===== */
+.question-image-container {
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.question-image-container img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 5px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* ===== SECCIÓN DE DATOS DEL USUARIO ===== */
+.englishline-user-data {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 -10px 20px;
+}
+
+.form-column {
+  flex: 1;
+  min-width: 250px;
+  padding: 0 10px;
+}
+
+.privacy-row {
+  margin-top: 30px;
+}
+
+.privacy-row .form-question-option {
+  display: flex;
+  align-items: flex-start;
+}
+
+.privacy-row .form-question-option input[type="checkbox"] {
+  margin-top: 4px;
+}
+
+/* ===== NAVEGACIÓN Y BOTONES ===== */
+.englishline-form-nav {
+    display: flex;
+    justify-content: space-between;
+    padding: 20px 30px;
+    background-color: #f9f9f9;
+    border-top: 1px solid #eee;
+}
+
+.englishline-form-container .button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 22px !important;
+    font-size: 15px !important;
+    border-radius: 30px !important;
+    border: none !important;
+    cursor: pointer !important;
+    font-weight: 500 !important;
+    min-width: 130px !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.englishline-form-container .button:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0%;
+    height: 100%;
+    background-color: rgba(255,255,255,0.1);
+    transition: width 0.3s ease;
+}
+
+.englishline-form-container .button:hover:before {
+    width: 100%;
+}
+
+.englishline-form-container .button-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s ease;
+}
+
+.englishline-form-prev {
+    background-color: #f1f1f1 !important;
+    color: #555 !important;
+}
+
+.englishline-form-prev .button-icon {
+    margin-right: 8px;
+}
+
+.englishline-form-prev:hover .button-icon {
+    transform: translateX(-3px);
+}
+
+.englishline-form-next {
+    background: linear-gradient(135deg, #3498db, #2980b9) !important;
+    color: white !important;
+}
+
+.englishline-form-next .button-icon {
+    margin-left: 8px;
+}
+
+.englishline-form-next:hover .button-icon {
+    transform: translateX(3px);
+}
+
+.englishline-form-next.submit-button {
+    background: linear-gradient(135deg, #27ae60, #2ecc71) !important;
+    transform: scale(1.05);
+    display: flex!important;
+}
+
+.englishline-form-next.submit-button:hover {
+    transform: scale(1.08);
+    box-shadow: 0 4px 10px rgba(46, 204, 113, 0.3) !important;
+}
+
+/* Efecto pulsante para el botón de enviar */
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(46, 204, 113, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
+}
+
+.englishline-form-next.submit-button {
+    animation: pulse 2s infinite;
+}
+
+/* ===== EFECTOS DE TRANSICIÓN ===== */
+.englishline-form-step-content {
+    animation: fadeSlideIn 0.5s ease;
+}
+
+@keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Añadir transición a las preguntas */
+.englishline-question {
+    transform: translateY(10px);
+    opacity: 0;
+    animation: appearQuestion 0.5s ease forwards;
+}
+
+@keyframes appearQuestion {
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.englishline-question:nth-child(1) { animation-delay: 0.1s; }
+.englishline-question:nth-child(2) { animation-delay: 0.2s; }
+.englishline-question:nth-child(3) { animation-delay: 0.3s; }
+.englishline-question:nth-child(4) { animation-delay: 0.4s; }
+.englishline-question:nth-child(5) { animation-delay: 0.5s; }
+.englishline-question:nth-child(6) { animation-delay: 0.6s; }
+.englishline-question:nth-child(n+7) { animation-delay: 0.7s; }
+
+/* Mejorar la apariencia de los campos del formulario */
+.englishline-form-step-content input[type="text"],
+.englishline-form-step-content input[type="email"],
+.englishline-form-step-content input[type="tel"],
+.englishline-form-step-content select,
+.englishline-form-step-content textarea {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 15px;
+    background-color: #fff;
+    transition: all 0.3s ease;
+}
+
+.englishline-form-step-content input[type="text"]:focus,
+.englishline-form-step-content input[type="email"]:focus,
+.englishline-form-step-content input[type="tel"]:focus,
+.englishline-form-step-content select:focus,
+.englishline-form-step-content textarea:focus {
+    border-color: #3498db;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+    transform: translateY(-2px);
+}
+
+/* Efectos para los indicadores de paso */
+.englishline-form-step {
+    position: relative;
+    transform: scale(0.95);
+    transition: all 0.3s ease;
+}
+
+.englishline-form-step:before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 100%;
+    height: 2px;
+    width: 0;
+    background: #3498db;
+    transition: width 0.5s ease;
+}
+
+.englishline-form-step.active {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.3);
+}
+
+.englishline-form-step.active:before {
+    width: 30px;
+}
+
+.englishline-form-step.completed {
+    background-color: #2ecc71;
+    border-color: #2ecc71;
+    color: white;
+}
+
+.englishline-form-step.completed:after {
+    content: "\f147";
+    font-family: dashicons;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.englishline-form-step.completed .step-number {
+    opacity: 0;
+}
+
+/* Loader más atractivo */
+.englishline-loader {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+    background: rgba(255, 255, 255, 0.9);
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+    backdrop-filter: blur(3px);
+}
+
+.englishline-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(52, 152, 219, 0.2);
+    border-radius: 50%;
+    border-top-color: #3498db;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Mensaje de éxito más atractivo */
+.englishline-form-success {
+    text-align: center;
+    padding: 30px;
+    animation: successPop 0.5s ease;
+}
+
+@keyframes successPop {
+    0% { transform: scale(0.8); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.englishline-form-success:before {
+    content: "\f147";
+    font-family: dashicons;
+    display: block;
+    font-size: 60px;
+    color: #2ecc71;
+    margin-bottom: 20px;
+}
+
+/* ===== ERRORES DE VALIDACIÓN ===== */
+.englishline-form-step-content input.error,
+.englishline-form-step-content select.error,
+.englishline-form-step-content textarea.error {
+  border-color: #f44336;
+  box-shadow: 0 0 0 2px rgba(244, 67, 54, 0.2);
+}
+
+/* ===== LOADER ===== */
+.englishline-loader {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px;
+  background: rgba(255, 255, 255, 0.8);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+}
+
+.englishline-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(52, 152, 219, 0.2);
+  border-radius: 50%;
+  border-top-color: #3498db;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .englishline-form-container {
+    margin: 20px auto;
+  }
+  
+  .englishline-form-header {
+    padding: 20px;
+  }
+  
+  .englishline-form-content {
+    padding: 20px;
+  }
+  
+  .form-column {
+    flex: 100%;
+    margin-bottom: 15px;
+  }
+  
+  .form-row {
+    margin-bottom: 0;
+  }
+  
+  .englishline-form-steps {
+    margin: 0 10px;
+  }
+  
+  .englishline-form-step {
+    margin: 0 8px;
+  }
+  
+  .button {
+    min-width: 100px !important;
+    padding: 10px 15px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .englishline-form-title {
+    font-size: 24px;
+  }
+  
+  .englishline-form-step {
+    width: 30px;
+    height: 30px;
+    margin: 0 5px;
+  }
+  
+  .englishline-form-nav {
+    padding: 15px;
+  }
+  
+  .button {
+    min-width: 90px !important;
+    font-size: 14px !important;
+  }
+  
+  .form-question-true-false .true-false-options {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
