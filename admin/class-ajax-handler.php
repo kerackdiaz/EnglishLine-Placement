@@ -553,6 +553,7 @@ class EnglishLine_Test_Ajax_Handler {
     /**
      * Actualiza el plugin desde GitHub
      */
+
     public function update_from_github() {
         // Verificar nonce para seguridad
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'englishline_update_plugin')) {
@@ -578,6 +579,12 @@ class EnglishLine_Test_Ajax_Handler {
         require_once(ABSPATH . 'wp-admin/includes/class-wp-upgrader.php');
         require_once(ABSPATH . 'wp-admin/includes/plugin-install.php');
         
+        // Información sobre el plugin actual
+        $plugin_slug = 'englishline-test';
+        $plugin_file = $plugin_slug . '/' . $plugin_slug . '.php';
+        $plugins_dir = WP_PLUGIN_DIR;
+        $plugin_dir = $plugins_dir . '/' . $plugin_slug;
+        
         // Iniciar buffer para capturar cualquier salida
         ob_start();
         
@@ -585,49 +592,109 @@ class EnglishLine_Test_Ajax_Handler {
         $skin = new WP_Ajax_Upgrader_Skin();
         $upgrader = new Plugin_Upgrader($skin);
         
-        // Deshabilitar las redirecciones
-        add_filter('redirect_to', '__return_false');
+        // 1. Descargar el archivo ZIP
+        $download_file = download_url($download_url);
         
-        // Intentar descargar e instalar
-        $result = $upgrader->install($download_url, array(
-            'overwrite_package' => true // Sobrescribir si ya existe
-        ));
-        
-        // Capturar cualquier mensaje de error
-        $error_messages = ob_get_clean();
-        
-        if (is_wp_error($result)) {
+        if (is_wp_error($download_file)) {
+            $error = ob_get_clean();
             wp_send_json_error(array(
-                'message' => 'Error al actualizar: ' . $result->get_error_message(),
-                'debug_info' => $error_messages
+                'message' => 'Error al descargar: ' . $download_file->get_error_message(),
+                'debug_info' => $error
             ));
             return;
         }
         
-        if (false === $result) {
-            wp_send_json_error(array(
-                'message' => 'La actualización falló por una razón desconocida.',
-                'debug_info' => $error_messages
-            ));
-            return;
+        // 2. Desactivar el plugin actual (si está activo)
+        $was_active = is_plugin_active($plugin_file);
+        if ($was_active) {
+            deactivate_plugins($plugin_file);
         }
-    
-        // Activar el plugin actualizado
-        $plugin_file = 'englishline-test/englishline-test.php'; 
-        $activate_result = activate_plugin($plugin_file);
         
-        if (is_wp_error($activate_result)) {
+        // 3. Eliminar el directorio del plugin existente
+        if (file_exists($plugin_dir)) {
+            $removed = $upgrader->clear_destination($plugin_dir);
+            if (is_wp_error($removed)) {
+                $error = ob_get_clean();
+                wp_send_json_error(array(
+                    'message' => 'Error al eliminar versión anterior: ' . $removed->get_error_message(),
+                    'debug_info' => $error
+                ));
+                return;
+            }
+        }
+        
+        // 4. Extraer el archivo ZIP
+        $unzip_result = unzip_file($download_file, $plugins_dir);
+        
+        // Eliminar el archivo ZIP temporal
+        @unlink($download_file);
+        
+        if (is_wp_error($unzip_result)) {
+            $error = ob_get_clean();
             wp_send_json_error(array(
-                'message' => 'Error al activar: ' . $activate_result->get_error_message(),
-                'debug_info' => $error_messages
+                'message' => 'Error al extraer: ' . $unzip_result->get_error_message(),
+                'debug_info' => $error
             ));
             return;
         }
-    
+        
+        // 5. Buscar el directorio extraído (GitHub añade un sufijo)
+        $extracted_dir = false;
+        $dir_handle = opendir($plugins_dir);
+        while (false !== ($entry = readdir($dir_handle))) {
+            if (strpos($entry, 'kerackdiaz-EnglishLine-Placement') === 0) {
+                $extracted_dir = $plugins_dir . '/' . $entry;
+                break;
+            }
+        }
+        closedir($dir_handle);
+        
+        if (!$extracted_dir) {
+            $error = ob_get_clean();
+            wp_send_json_error(array(
+                'message' => 'No se pudo encontrar el directorio extraído',
+                'debug_info' => $error
+            ));
+            return;
+        }
+        
+        // 6. Renombrar el directorio extraído
+        if ($extracted_dir != $plugin_dir) {
+            if (file_exists($plugin_dir)) {
+                // En caso de que aún exista por algún motivo
+                $upgrader->clear_destination($plugin_dir);
+            }
+            $renamed = rename($extracted_dir, $plugin_dir);
+            if (!$renamed) {
+                $error = ob_get_clean();
+                wp_send_json_error(array(
+                    'message' => 'No se pudo renombrar el directorio del plugin',
+                    'debug_info' => $error
+                ));
+                return;
+            }
+        }
+        
+        // 7. Reactivar el plugin si estaba activo
+        if ($was_active) {
+            $activate_result = activate_plugin($plugin_file);
+            if (is_wp_error($activate_result)) {
+                $error = ob_get_clean();
+                wp_send_json_error(array(
+                    'message' => 'Error al reactivar: ' . $activate_result->get_error_message(),
+                    'debug_info' => $error
+                ));
+                return;
+            }
+        }
+        
+        // Capturar cualquier mensaje y limpiar buffer
+        $debug_info = ob_get_clean();
+        
         // Éxito
         wp_send_json_success(array(
-            'message' => 'El plugin se ha actualizado y activado correctamente.',
-            'debug_info' => $error_messages
+            'message' => 'El plugin se ha actualizado correctamente' . ($was_active ? ' y reactivado' : ''),
+            'debug_info' => $debug_info
         ));
     }
 

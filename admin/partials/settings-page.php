@@ -516,7 +516,7 @@ $options = get_option('englishline_test_settings', array());
             }
         
             let $statusElement = $('#github-update-status');
-            let downloadUrl = $(this).data('download-url'); // Cambio aquí - obtenemos la URL
+            let downloadUrl = $(this).data('download-url'); 
         
             $statusElement.html('<span style="color:#999;"><?php esc_html_e('Actualizando...', 'englishline-test'); ?></span>');
         
@@ -526,7 +526,7 @@ $options = get_option('englishline_test_settings', array());
                 data: {
                     action: 'englishline_update_from_github',
                     nonce: '<?php echo wp_create_nonce('englishline_update_plugin'); ?>',
-                    download_url: downloadUrl // Cambio aquí - enviamos download_url, no version
+                    download_url: downloadUrl 
                 },
                 success: function(response) {
                     if (response.success) {
