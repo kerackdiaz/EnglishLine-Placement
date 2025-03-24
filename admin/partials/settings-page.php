@@ -327,10 +327,10 @@ $options = get_option('englishline_test_settings', array());
                                     <?php esc_html_e('Exportar todos los datos', 'englishline-test'); ?>
                                 </a>
                             </p>
-                    
+
                             <div id="englishline-import-section">
                                 <input type="file" id="englishline_import_file" accept=".json">
-                                
+
                                 <div class="duplicate-options" style="margin: 10px 0;">
                                     <label style="display: block; margin-bottom: 5px;"><strong><?php esc_html_e('¿Qué hacer con duplicados?', 'englishline-test'); ?></strong></label>
                                     <select id="duplicate_action">
@@ -346,11 +346,11 @@ $options = get_option('englishline_test_settings', array());
                                         <strong><?php esc_html_e('Importación completa:', 'englishline-test'); ?></strong> <?php esc_html_e('Incluye resultados y calificaciones (solo para migraciones)', 'englishline-test'); ?>
                                     </p>
                                 </div>
-                                
+
                                 <button type="button" id="englishline_import_button" class="button">
                                     <?php esc_html_e('Importar datos', 'englishline-test'); ?>
                                 </button>
-                                
+
                                 <div id="import_results" style="margin-top: 15px; display: none;"></div>
                             </div>
                         </td>
@@ -488,8 +488,11 @@ $options = get_option('englishline_test_settings', array());
                     if (response.success) {
                         if (response.data.update_available) {
                             $statusElement.html(
-                                '<span style="color:green;"><?php esc_html_e('Nueva versión disponible:', 'englishline-test'); ?> ' + response.data.new_version + '</span> ' +
-                                '<a href="#" class="button button-small update-from-github" data-version="' + response.data.new_version + '"><?php esc_html_e('Actualizar ahora', 'englishline-test'); ?></a>'
+                                '<span style="color:green;"><?php esc_html_e('Nueva versión disponible:', 'englishline-test'); ?> ' +
+                                response.data.latest_version + '</span> ' +
+                                '<a href="#" class="button button-small update-from-github" ' +
+                                'data-download-url="' + response.data.download_url + '">' +
+                                '<?php esc_html_e('Actualizar ahora', 'englishline-test'); ?></a>'
                             );
                         } else {
                             $statusElement.html('<span style="color:green;"><?php esc_html_e('Tienes la última versión', 'englishline-test'); ?></span>');
@@ -507,28 +510,28 @@ $options = get_option('englishline_test_settings', array());
         // Actualizar desde GitHub
         $(document).on('click', '.update-from-github', function(e) {
             e.preventDefault();
-
+        
             if (!confirm('<?php esc_html_e('¿Estás seguro de que deseas actualizar el plugin? Se recomienda hacer una copia de seguridad antes de continuar.', 'englishline-test'); ?>')) {
                 return;
             }
-
+        
             let $statusElement = $('#github-update-status');
-            let version = $(this).data('version');
-
+            let downloadUrl = $(this).data('download-url'); // Cambio aquí - obtenemos la URL
+        
             $statusElement.html('<span style="color:#999;"><?php esc_html_e('Actualizando...', 'englishline-test'); ?></span>');
-
+        
             $.ajax({
                 url: ajaxurl,
                 type: 'POST',
                 data: {
                     action: 'englishline_update_from_github',
                     nonce: '<?php echo wp_create_nonce('englishline_update_plugin'); ?>',
-                    version: version
+                    download_url: downloadUrl // Cambio aquí - enviamos download_url, no version
                 },
                 success: function(response) {
                     if (response.success) {
                         $statusElement.html('<span style="color:green;">' + response.data.message + '</span>');
-
+        
                         // Recargar página después de 2 segundos
                         setTimeout(function() {
                             window.location.reload();
@@ -543,22 +546,22 @@ $options = get_option('englishline_test_settings', array());
             });
         });
 
-                // Manejo de importación de datos
+        // Manejo de importación de datos
         $('#englishline_import_button').on('click', function() {
             var fileInput = document.getElementById('englishline_import_file');
             var duplicateAction = $('#duplicate_action').val();
-            
+
             if (fileInput.files.length === 0) {
                 alert('<?php esc_html_e('Por favor, selecciona un archivo para importar.', 'englishline-test'); ?>');
                 return;
             }
-            
+
             var file = fileInput.files[0];
             var reader = new FileReader();
-            
+
             reader.onload = function(e) {
                 var fileContent = e.target.result;
-                
+
                 $.ajax({
                     url: ajaxurl,
                     type: 'POST',
@@ -578,22 +581,22 @@ $options = get_option('englishline_test_settings', array());
                             html += '<ul style="list-style-type: disc; padding-left: 20px;">';
                             html += '<li><?php esc_html_e('Configuración:', 'englishline-test'); ?> ' + (stats.settings_imported ? '<?php esc_html_e('Importada', 'englishline-test'); ?>' : '<?php esc_html_e('No importada', 'englishline-test'); ?>') + '</li>';
                             html += '<li><?php esc_html_e('Formularios:', 'englishline-test'); ?> ' + stats.forms_imported + ' <?php esc_html_e('importados', 'englishline-test'); ?>, ' + stats.forms_updated + ' <?php esc_html_e('actualizados', 'englishline-test'); ?>, ' + stats.forms_skipped + ' <?php esc_html_e('omitidos', 'englishline-test'); ?></li>';
-                            
+
                             if (stats.templates_imported > 0) {
                                 html += '<li><?php esc_html_e('Plantillas de correo:', 'englishline-test'); ?> ' + stats.templates_imported + ' <?php esc_html_e('importadas', 'englishline-test'); ?></li>';
                             }
-                            
+
                             if (stats.results_imported > 0) {
                                 html += '<li><?php esc_html_e('Resultados:', 'englishline-test'); ?> ' + stats.results_imported + ' <?php esc_html_e('importados', 'englishline-test'); ?></li>';
                             }
-                            
+
                             if (stats.submissions_imported > 0) {
                                 html += '<li><?php esc_html_e('Envíos:', 'englishline-test'); ?> ' + stats.submissions_imported + ' <?php esc_html_e('importados', 'englishline-test'); ?></li>';
                             }
-                            
+
                             html += '</ul>';
                             html += '<p><em><?php esc_html_e('Versión importada:', 'englishline-test'); ?> ' + response.data.imported_version + ' (<?php esc_html_e('fecha:', 'englishline-test'); ?> ' + response.data.imported_date + ')</em></p></div>';
-                            
+
                             $('#import_results').html(html);
                         } else {
                             $('#import_results').html('<div class="notice notice-error inline"><p><strong><?php esc_html_e('Error:', 'englishline-test'); ?></strong> ' + response.data.message + '</p></div>');
@@ -604,7 +607,7 @@ $options = get_option('englishline_test_settings', array());
                     }
                 });
             };
-            
+
             reader.readAsText(file);
         });
     });

@@ -535,7 +535,7 @@ class EnglishLine_Test_Ajax_Handler {
         }
     
         // Remover el 'v' inicial si existe (v1.0.0 -> 1.0.0)
-        $latest_version = preg_replace('/^v/', '', $release_info->tag_name);
+        $latest_version = preg_replace('/^[vV]/', '', $release_info->tag_name);
     
         // Comparar versiones
         $update_available = version_compare($latest_version, $current_version, '>');
