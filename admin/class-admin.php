@@ -97,8 +97,8 @@ class EnglishLine_Test_Admin
     {
         // Menú principal
         add_menu_page(
-            __('EnglishLine Test', 'englishline-test'),
-            __('EnglishLine Test', 'englishline-test'),
+            __('EnglishLine Placement', 'englishline-test'),
+            __('EnglishLine Placement', 'englishline-test'),
             'manage_options',
             'englishline-test',
             array($this, 'display_plugin_dashboard_page'),

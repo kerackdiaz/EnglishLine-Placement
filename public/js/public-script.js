@@ -3,9 +3,7 @@
  */
 
 jQuery(document).ready(function($) {
-    console.log('EnglishLine Test: public-script.js cargado y ejecutándose!');
 
-    // IMPORTANTE: Primero declarar las variables globales
     const sectionTimers = {};
     const timedOutSections = new Set();
 
@@ -55,7 +53,7 @@ jQuery(document).ready(function($) {
         const minutes = parseInt($timer.data('minutes')) || 0;
         if (minutes <= 0) return;
         
-        console.log(`Iniciando temporizador para la sección ${sectionIndex}: ${minutes} minutos`);
+
         
         // Detener temporizador existente si lo hay
         stopSectionTimer(sectionIndex);
@@ -108,8 +106,6 @@ jQuery(document).ready(function($) {
             let currentStep = 0;
             let totalSteps = $steps.length;
 
-            console.log('Inicializando formulario:', $form.attr('id'), 'con', totalSteps, 'pasos');
-
             // Ocultar todos los pasos excepto el primero
             $steps.not(':first').hide();
 
@@ -122,14 +118,12 @@ jQuery(document).ready(function($) {
             // Manejar clic en botón siguiente
             $form.on('click', '.englishline-form-next', function(e) {
                 e.preventDefault();
-                console.log('Clic en botón siguiente, paso actual:', currentStep, 'de', totalSteps);
 
                 // Detener el temporizador actual
                 stopSectionTimer(currentStep);
 
                 // Si estamos en el último paso (paso de contacto), este botón funciona como enviar
                 if (currentStep === totalSteps - 1) {
-                    console.log('Último paso - intentando enviar formulario');
                     if (validateStep(currentStep)) {
                         submitForm();
                     }
@@ -146,7 +140,7 @@ jQuery(document).ready(function($) {
             // Manejar clic en botón anterior
             $form.on('click', '.englishline-form-prev', function(e) {
                 e.preventDefault();
-                console.log('Clic en botón anterior');
+
                 
                 // Verificar si la sección anterior tiene tiempo agotado
                 const targetStep = currentStep - 1;
@@ -166,7 +160,6 @@ jQuery(document).ready(function($) {
             // Manejar clic en botón enviar específico
             $form.on('click', '.englishline-form-submit', function(e) {
                 e.preventDefault();
-                console.log('Clic en botón enviar');
                 if (validateStep(currentStep)) {
                     submitForm();
                 }
@@ -176,7 +169,6 @@ jQuery(document).ready(function($) {
              * Muestra un paso específico del formulario
              */
             function showStep(stepIndex) {
-                console.log('Mostrando paso:', stepIndex);
                 $steps.hide();
                 $steps.eq(stepIndex).show();
 
@@ -282,12 +274,10 @@ jQuery(document).ready(function($) {
                 let formData = new FormData($formElement[0]);
                 
                 // Añadir datos adicionales necesarios
-                formData.append('action', 'englishline_form_submit');  // Usar este nombre en el backend
+                formData.append('action', 'englishline_form_submit'); 
                 formData.append('nonce', englishline_test.nonce);
                 formData.append('form_id', $form.data('form-id'));
 
-                console.log('Enviando a:', englishline_test.ajax_url);
-                console.log('ID del formulario:', $form.data('form-id'));
 
                 // Enviar mediante Ajax
                 $.ajax({
@@ -297,7 +287,6 @@ jQuery(document).ready(function($) {
                     processData: false,
                     contentType: false,
                     success: function(response) {
-                        console.log('Respuesta recibida:', response);
                         $form.removeClass('submitting');
                         $form.find('.englishline-loader').hide();
 
@@ -446,7 +435,6 @@ jQuery(document).ready(function($) {
                     const originalIndex = $(this).data('original-index');
                     $(this).find('input[type="hidden"]').val(originalIndex);
                 });
-                console.log('Orden actualizado en elemento:', $(this).data('question'));
             }
         });
     } else if ($('.ordering-list').length > 0) {
@@ -485,6 +473,5 @@ jQuery(document).ready(function($) {
         }
     `;
     
-    // Añadir estilos al head
     $('head').append('<style>' + timerStyles + '</style>');
 });

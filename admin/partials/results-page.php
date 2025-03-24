@@ -31,7 +31,7 @@ if ($action === 'delete' && $result_id > 0 && isset($_GET['_wpnonce']) && wp_ver
 if (!$results_table_exists) {
     ?>
     <div class="wrap">
-        <h1><?php esc_html_e('Resultados de EnglishLine Test', 'englishline-test'); ?></h1>
+        <h1><?php esc_html_e('Resultados de EnglishLine Placement', 'englishline-test'); ?></h1>
         <div class="notice notice-error">
             <p><?php esc_html_e('Las tablas necesarias no existen. Por favor, desactiva y reactiva el plugin para crear las tablas.', 'englishline-test'); ?></p>
         </div>

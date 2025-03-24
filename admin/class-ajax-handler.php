@@ -27,6 +27,8 @@ class EnglishLine_Test_Ajax_Handler {
     public function __construct($plugin_name = '', $version = '') {
         $this->plugin_name = $plugin_name;
         $this->version = $version;
+
+        add_action('admin_post_englishline_export_data', array($this, 'handle_export_data'));
     }
 
     /**
@@ -629,6 +631,68 @@ class EnglishLine_Test_Ajax_Handler {
         ));
     }
 
+/**
+ * Maneja la exportación de datos del plugin
+ */
+public function handle_export_data() {
+    // Verificar el nonce
+    if (!isset($_GET['_wpnonce']) || !wp_verify_nonce($_GET['_wpnonce'], 'englishline_export_data')) {
+        wp_die('Error de seguridad. Por favor, intenta nuevamente.', 'Error', array('response' => 400));
+    }
+
+    // Verificar permisos
+    if (!current_user_can('manage_options')) {
+        wp_die('No tienes permisos para realizar esta acción.', 'Error de permisos', array('response' => 403));
+    }
+
+    // Obtener todos los datos necesarios
+    global $wpdb;
+    $data = array(
+        'plugin_name' => 'EnglishLine Placement',
+        'version' => $this->version,
+        'export_date' => current_time('mysql'),
+        'settings' => get_option('englishline_test_settings', array()),
+    );
+
+    // Obtener formularios
+    $forms_table = $wpdb->prefix . 'englishline_forms';
+    if ($wpdb->get_var("SHOW TABLES LIKE '$forms_table'") == $forms_table) {
+        $data['forms'] = $wpdb->get_results("SELECT * FROM $forms_table", ARRAY_A);
+    }
+    
+    // Obtener resultados/calificaciones
+    $results_table = $wpdb->prefix . 'englishline_results';
+    if ($wpdb->get_var("SHOW TABLES LIKE '$results_table'") == $results_table) {
+        $data['results'] = $wpdb->get_results("SELECT * FROM $results_table", ARRAY_A);
+    }
+    
+    // Obtener envíos/submissions
+    $submissions_table = $wpdb->prefix . 'englishline_submissions';
+    if ($wpdb->get_var("SHOW TABLES LIKE '$submissions_table'") == $submissions_table) {
+        $data['submissions'] = $wpdb->get_results("SELECT * FROM $submissions_table", ARRAY_A);
+    }
+    
+    // Obtener plantillas de correo
+    $email_templates_table = $wpdb->prefix . 'englishline_email_templates';
+    if ($wpdb->get_var("SHOW TABLES LIKE '$email_templates_table'") == $email_templates_table) {
+        $data['email_templates'] = $wpdb->get_results("SELECT * FROM $email_templates_table", ARRAY_A);
+    }
+
+    // Generar el nombre del archivo
+    $filename = 'englishline-placement-export-' . date('Y-m-d') . '.json';
+
+    // Configurar las cabeceras para descargar un archivo
+    header('Content-Type: application/json');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+
+    // Enviar los datos como JSON
+    echo json_encode($data, JSON_PRETTY_PRINT);
+    exit;
+}
+
     /**
      * Exporta la configuración del plugin
      */
@@ -648,7 +712,7 @@ class EnglishLine_Test_Ajax_Handler {
         
         // Añadir información extra
         $export_data = array(
-            'plugin_name' => 'EnglishLine Test',
+            'plugin_name' => 'EnglishLine Placement',
             'version' => $this->version,
             'export_date' => current_time('mysql'),
             'settings' => $settings
@@ -662,7 +726,7 @@ class EnglishLine_Test_Ajax_Handler {
     }
 
     /**
-     * Importa la configuración del plugin
+     * Importa la configuración y datos completos del plugin
      */
     public function import_settings() {
         // Verificar nonce para seguridad
@@ -672,7 +736,7 @@ class EnglishLine_Test_Ajax_Handler {
     
         // Verificar permisos
         if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => 'No tienes permiso para importar la configuración.'));
+            wp_send_json_error(array('message' => 'No tienes permiso para importar datos.'));
         }
     
         // Verificar que hay datos para importar
@@ -685,23 +749,255 @@ class EnglishLine_Test_Ajax_Handler {
         $import_data = json_decode(stripslashes($_POST['settings_data']), true);
         
         // Verificar que los datos son válidos
-        if (!$import_data || !isset($import_data['settings']) || !is_array($import_data['settings'])) {
-            wp_send_json_error(array('message' => 'Los datos de importación no son válidos.'));
+        if (!$import_data) {
+            wp_send_json_error(array('message' => 'Los datos de importación no son válidos o tienen formato incorrecto.'));
             return;
         }
         
         // Validar que pertenecen al plugin correcto
-        if (!isset($import_data['plugin_name']) || $import_data['plugin_name'] !== 'EnglishLine Test') {
-            wp_send_json_error(array('message' => 'Los datos no pertenecen a EnglishLine Test.'));
+        if (!isset($import_data['plugin_name']) || $import_data['plugin_name'] !== 'EnglishLine Placement') {
+            wp_send_json_error(array('message' => 'Los datos no pertenecen a EnglishLine Placement.'));
             return;
         }
         
-        // Actualizar configuración
-        update_option('englishline_test_settings', $import_data['settings']);
+        global $wpdb;
+        $stats = array(
+            'settings_imported' => false,
+            'forms_imported' => 0,
+            'forms_updated' => 0,
+            'forms_skipped' => 0,
+            'templates_imported' => 0,
+            'results_imported' => 0,
+            'submissions_imported' => 0
+        );
         
-        // Éxito
+        // Modo para manejar duplicados (skip, update, rename)
+        $duplicate_mode = isset($_POST['duplicate_action']) ? sanitize_text_field($_POST['duplicate_action']) : 'skip';
+        
+        // 1. Importar configuración si existe
+        if (isset($import_data['settings']) && is_array($import_data['settings'])) {
+            update_option('englishline_test_settings', $import_data['settings']);
+            $stats['settings_imported'] = true;
+        }
+        
+        // 2. Importar formularios si existen
+        if (isset($import_data['forms']) && is_array($import_data['forms'])) {
+            $forms_table = $wpdb->prefix . 'englishline_forms';
+            
+            // Verificar si la tabla existe
+            if ($wpdb->get_var("SHOW TABLES LIKE '$forms_table'") != $forms_table) {
+                // La tabla no existe, informamos pero continuamos con otras importaciones
+                $stats['forms_error'] = 'La tabla de formularios no existe';
+            } else {
+                // Obtener todos los shortcodes y títulos existentes para verificar duplicados
+                $existing_shortcodes = $wpdb->get_col("SELECT shortcode FROM $forms_table");
+                $existing_titles = $wpdb->get_col("SELECT title FROM $forms_table");
+                
+                foreach ($import_data['forms'] as $form) {
+                    // Sanear datos críticos
+                    $title = isset($form['title']) ? sanitize_text_field($form['title']) : '';
+                    $description = isset($form['description']) ? sanitize_textarea_field($form['description']) : '';
+                    $shortcode = isset($form['shortcode']) ? sanitize_text_field($form['shortcode']) : '';
+                    $form_data = isset($form['form_data']) ? $form['form_data'] : '';
+                    $form_style = isset($form['form_style']) ? $form['form_style'] : '';
+                    
+                    // Verificar si es un duplicado por shortcode o título
+                    $is_duplicate_shortcode = in_array($shortcode, $existing_shortcodes);
+                    $is_duplicate_title = in_array($title, $existing_titles);
+                    
+                    if ($is_duplicate_shortcode || $is_duplicate_title) {
+                        // MODO ACTUALIZAR: Reemplazar el formulario existente
+                        if ($duplicate_mode === 'update' && $is_duplicate_shortcode) {
+                            $result = $wpdb->update(
+                                $forms_table,
+                                array(
+                                    'title' => $title,
+                                    'description' => $description,
+                                    'form_data' => $form_data,
+                                    'form_style' => $form_style,
+                                    'updated_at' => current_time('mysql')
+                                ),
+                                array('shortcode' => $shortcode),
+                                array('%s', '%s', '%s', '%s', '%s'),
+                                array('%s')
+                            );
+                            
+                            if ($result !== false) {
+                                $stats['forms_updated']++;
+                            }
+                        }
+                        // MODO RENOMBRAR: Crear copia con nuevo título y shortcode
+                        else if ($duplicate_mode === 'rename') {
+                            $new_shortcode = 'et_form_' . time() . '_' . mt_rand(1000, 9999);
+                            $new_title = sprintf('Copia de %s', $title);
+                            
+                            $result = $wpdb->insert(
+                                $forms_table,
+                                array(
+                                    'title' => $new_title,
+                                    'description' => $description,
+                                    'form_data' => $form_data,
+                                    'form_style' => $form_style,
+                                    'shortcode' => $new_shortcode,
+                                    'created_at' => current_time('mysql'),
+                                    'updated_at' => current_time('mysql')
+                                ),
+                                array('%s', '%s', '%s', '%s', '%s', '%s', '%s')
+                            );
+                            
+                            if ($result) {
+                                $stats['forms_imported']++;
+                                // Agregar a listas para evitar duplicados en siguientes iteraciones
+                                $existing_shortcodes[] = $new_shortcode;
+                                $existing_titles[] = $new_title;
+                            }
+                        }
+                        // MODO SALTAR (default): No hacer nada con duplicados
+                        else {
+                            $stats['forms_skipped']++;
+                        }
+                    } 
+                    // No es duplicado, importar directamente
+                    else {
+                        $result = $wpdb->insert(
+                            $forms_table,
+                            array(
+                                'title' => $title,
+                                'description' => $description,
+                                'form_data' => $form_data,
+                                'form_style' => $form_style,
+                                'shortcode' => $shortcode,
+                                'created_at' => isset($form['created_at']) ? $form['created_at'] : current_time('mysql'),
+                                'updated_at' => current_time('mysql')
+                            ),
+                            array('%s', '%s', '%s', '%s', '%s', '%s', '%s')
+                        );
+                        
+                        if ($result) {
+                            $stats['forms_imported']++;
+                            // Agregar a listas para evitar duplicados
+                            $existing_shortcodes[] = $shortcode;
+                            $existing_titles[] = $title;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 3. Importar plantillas de correo si existen
+        if (isset($import_data['email_templates']) && is_array($import_data['email_templates'])) {
+            $templates_table = $wpdb->prefix . 'englishline_email_templates';
+            
+            if ($wpdb->get_var("SHOW TABLES LIKE '$templates_table'") != $templates_table) {
+                $stats['templates_error'] = 'La tabla de plantillas no existe';
+            } else {
+                // Obtener nombres existentes para evitar duplicados
+                $existing_names = $wpdb->get_col("SELECT name FROM $templates_table");
+                
+                foreach ($import_data['email_templates'] as $template) {
+                    $name = isset($template['name']) ? sanitize_text_field($template['name']) : '';
+                    $subject = isset($template['subject']) ? sanitize_text_field($template['subject']) : '';
+                    $content = isset($template['content']) ? $template['content'] : '';
+                    
+                    // Verificar si ya existe
+                    if (in_array($name, $existing_names)) {
+                        if ($duplicate_mode === 'update') {
+                            // Actualizar la plantilla existente
+                            $result = $wpdb->update(
+                                $templates_table,
+                                array('subject' => $subject, 'content' => $content),
+                                array('name' => $name),
+                                array('%s', '%s'),
+                                array('%s')
+                            );
+                        } else if ($duplicate_mode === 'rename') {
+                            // Crear con nuevo nombre
+                            $new_name = $name . '_' . date('Ymd');
+                            $result = $wpdb->insert(
+                                $templates_table,
+                                array('name' => $new_name, 'subject' => $subject, 'content' => $content),
+                                array('%s', '%s', '%s')
+                            );
+                            
+                            if ($result) {
+                                $stats['templates_imported']++;
+                                $existing_names[] = $new_name;
+                            }
+                        }
+                        // Si es 'skip', no hacemos nada
+                    } else {
+                        // No existe, importar directamente
+                        $result = $wpdb->insert(
+                            $templates_table,
+                            array('name' => $name, 'subject' => $subject, 'content' => $content),
+                            array('%s', '%s', '%s')
+                        );
+                        
+                        if ($result) {
+                            $stats['templates_imported']++;
+                            $existing_names[] = $name;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 4. Importar resultados si existen (opcional, generalmente no se importan resultados)
+        if (isset($import_data['results']) && is_array($import_data['results']) && $duplicate_mode === 'full_import') {
+            $results_table = $wpdb->prefix . 'englishline_results';
+            
+            if ($wpdb->get_var("SHOW TABLES LIKE '$results_table'") == $results_table) {
+                foreach ($import_data['results'] as $result) {
+                    // Omitir el ID para generar uno nuevo
+                    unset($result['id']);
+                    
+                    $columns = array();
+                    $formats = array();
+                    
+                    foreach ($result as $key => $value) {
+                        $columns[$key] = $value;
+                        $formats[] = is_numeric($value) ? '%d' : '%s';
+                    }
+                    
+                    $result = $wpdb->insert($results_table, $columns, $formats);
+                    
+                    if ($result) {
+                        $stats['results_imported']++;
+                    }
+                }
+            }
+        }
+        
+        // 5. Importar submissions si existen (opcional)
+        if (isset($import_data['submissions']) && is_array($import_data['submissions']) && $duplicate_mode === 'full_import') {
+            $submissions_table = $wpdb->prefix . 'englishline_submissions';
+            
+            if ($wpdb->get_var("SHOW TABLES LIKE '$submissions_table'") == $submissions_table) {
+                foreach ($import_data['submissions'] as $submission) {
+                    // Omitir el ID para generar uno nuevo
+                    unset($submission['id']);
+                    
+                    $columns = array();
+                    $formats = array();
+                    
+                    foreach ($submission as $key => $value) {
+                        $columns[$key] = $value;
+                        $formats[] = is_numeric($value) ? '%d' : '%s';
+                    }
+                    
+                    $result = $wpdb->insert($submissions_table, $columns, $formats);
+                    
+                    if ($result) {
+                        $stats['submissions_imported']++;
+                    }
+                }
+            }
+        }
+        
+        // Éxito con estadísticas
         wp_send_json_success(array(
-            'message' => 'Configuración importada correctamente.',
+            'message' => 'Importación completada correctamente.',
+            'stats' => $stats,
             'imported_version' => isset($import_data['version']) ? $import_data['version'] : 'desconocida',
             'imported_date' => isset($import_data['export_date']) ? $import_data['export_date'] : 'desconocida'
         ));

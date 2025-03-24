@@ -327,14 +327,32 @@ $options = get_option('englishline_test_settings', array());
                                     <?php esc_html_e('Exportar todos los datos', 'englishline-test'); ?>
                                 </a>
                             </p>
-
-                            <p>
-                                <input type="file" id="englishline_import_file" name="englishline_import_file" accept=".json">
-                                <button type="submit" name="englishline_import_data" class="button" value="1">
+                    
+                            <div id="englishline-import-section">
+                                <input type="file" id="englishline_import_file" accept=".json">
+                                
+                                <div class="duplicate-options" style="margin: 10px 0;">
+                                    <label style="display: block; margin-bottom: 5px;"><strong><?php esc_html_e('¿Qué hacer con duplicados?', 'englishline-test'); ?></strong></label>
+                                    <select id="duplicate_action">
+                                        <option value="skip"><?php esc_html_e('Omitir duplicados', 'englishline-test'); ?></option>
+                                        <option value="update"><?php esc_html_e('Actualizar existentes', 'englishline-test'); ?></option>
+                                        <option value="rename"><?php esc_html_e('Crear como copias', 'englishline-test'); ?></option>
+                                        <option value="full_import"><?php esc_html_e('Importación completa (incluye resultados)', 'englishline-test'); ?></option>
+                                    </select>
+                                    <p class="description" style="margin-top: 5px;">
+                                        <strong><?php esc_html_e('Omitir:', 'englishline-test'); ?></strong> <?php esc_html_e('No importa formularios que ya existan', 'englishline-test'); ?><br>
+                                        <strong><?php esc_html_e('Actualizar:', 'englishline-test'); ?></strong> <?php esc_html_e('Reemplaza formularios existentes', 'englishline-test'); ?><br>
+                                        <strong><?php esc_html_e('Crear copias:', 'englishline-test'); ?></strong> <?php esc_html_e('Crea copias con nuevos nombres', 'englishline-test'); ?><br>
+                                        <strong><?php esc_html_e('Importación completa:', 'englishline-test'); ?></strong> <?php esc_html_e('Incluye resultados y calificaciones (solo para migraciones)', 'englishline-test'); ?>
+                                    </p>
+                                </div>
+                                
+                                <button type="button" id="englishline_import_button" class="button">
                                     <?php esc_html_e('Importar datos', 'englishline-test'); ?>
                                 </button>
-                            </p>
-                            <p class="description"><?php esc_html_e('Exporta o importa formularios y configuraciones', 'englishline-test'); ?></p>
+                                
+                                <div id="import_results" style="margin-top: 15px; display: none;"></div>
+                            </div>
                         </td>
                     </tr>
 
@@ -523,6 +541,71 @@ $options = get_option('englishline_test_settings', array());
                     $statusElement.html('<span style="color:red;"><?php esc_html_e('Error al actualizar el plugin', 'englishline-test'); ?></span>');
                 }
             });
+        });
+
+                // Manejo de importación de datos
+        $('#englishline_import_button').on('click', function() {
+            var fileInput = document.getElementById('englishline_import_file');
+            var duplicateAction = $('#duplicate_action').val();
+            
+            if (fileInput.files.length === 0) {
+                alert('<?php esc_html_e('Por favor, selecciona un archivo para importar.', 'englishline-test'); ?>');
+                return;
+            }
+            
+            var file = fileInput.files[0];
+            var reader = new FileReader();
+            
+            reader.onload = function(e) {
+                var fileContent = e.target.result;
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'englishline_import_settings',
+                        nonce: '<?php echo wp_create_nonce('englishline_import_settings'); ?>',
+                        settings_data: fileContent,
+                        duplicate_action: duplicateAction
+                    },
+                    beforeSend: function() {
+                        $('#import_results').html('<p><?php esc_html_e('Importando datos...', 'englishline-test'); ?></p>').show();
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            var stats = response.data.stats;
+                            var html = '<div class="notice notice-success inline"><p><strong><?php esc_html_e('Importación exitosa:', 'englishline-test'); ?></strong></p>';
+                            html += '<ul style="list-style-type: disc; padding-left: 20px;">';
+                            html += '<li><?php esc_html_e('Configuración:', 'englishline-test'); ?> ' + (stats.settings_imported ? '<?php esc_html_e('Importada', 'englishline-test'); ?>' : '<?php esc_html_e('No importada', 'englishline-test'); ?>') + '</li>';
+                            html += '<li><?php esc_html_e('Formularios:', 'englishline-test'); ?> ' + stats.forms_imported + ' <?php esc_html_e('importados', 'englishline-test'); ?>, ' + stats.forms_updated + ' <?php esc_html_e('actualizados', 'englishline-test'); ?>, ' + stats.forms_skipped + ' <?php esc_html_e('omitidos', 'englishline-test'); ?></li>';
+                            
+                            if (stats.templates_imported > 0) {
+                                html += '<li><?php esc_html_e('Plantillas de correo:', 'englishline-test'); ?> ' + stats.templates_imported + ' <?php esc_html_e('importadas', 'englishline-test'); ?></li>';
+                            }
+                            
+                            if (stats.results_imported > 0) {
+                                html += '<li><?php esc_html_e('Resultados:', 'englishline-test'); ?> ' + stats.results_imported + ' <?php esc_html_e('importados', 'englishline-test'); ?></li>';
+                            }
+                            
+                            if (stats.submissions_imported > 0) {
+                                html += '<li><?php esc_html_e('Envíos:', 'englishline-test'); ?> ' + stats.submissions_imported + ' <?php esc_html_e('importados', 'englishline-test'); ?></li>';
+                            }
+                            
+                            html += '</ul>';
+                            html += '<p><em><?php esc_html_e('Versión importada:', 'englishline-test'); ?> ' + response.data.imported_version + ' (<?php esc_html_e('fecha:', 'englishline-test'); ?> ' + response.data.imported_date + ')</em></p></div>';
+                            
+                            $('#import_results').html(html);
+                        } else {
+                            $('#import_results').html('<div class="notice notice-error inline"><p><strong><?php esc_html_e('Error:', 'englishline-test'); ?></strong> ' + response.data.message + '</p></div>');
+                        }
+                    },
+                    error: function() {
+                        $('#import_results').html('<div class="notice notice-error inline"><p><strong><?php esc_html_e('Error al procesar la solicitud.', 'englishline-test'); ?></strong></p></div>');
+                    }
+                });
+            };
+            
+            reader.readAsText(file);
         });
     });
 </script>

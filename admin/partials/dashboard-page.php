@@ -6,7 +6,7 @@
 
 <div class="wrap englishline-admin-wrap">
     <div class="englishline-admin-header">
-        <h1><?php esc_html_e('EnglishLine Test - Panel de Control', 'englishline-test'); ?></h1>
+        <h1><?php esc_html_e('EnglishLine Placement - Panel de Control', 'englishline-test'); ?></h1>
     </div>
     
     <div class="englishline-admin-content">
