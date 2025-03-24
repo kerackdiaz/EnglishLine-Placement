@@ -295,7 +295,7 @@ class EnglishLine_Test_Ajax_Handler
                 'description' => $original_form['description'],
                 'settings' => $original_form['settings'],
                 'fields' => $original_form['fields'],
-                'status' => 'draft', // La copia siempre comienza como borrador
+                'status' => 'draft', 
                 'created_at' => current_time('mysql'),
                 'updated_at' => current_time('mysql'),
                 'author_id' => get_current_user_id()
@@ -604,7 +604,7 @@ class EnglishLine_Test_Ajax_Handler
         }
 
         // URL del repositorio en GitHub y nombre del plugin
-        $github_repo = 'kerackdiaz/EnglishLine-Placement'; // Reemplazar con el usuario/repo correcto
+        $github_repo = 'kerackdiaz/EnglishLine-Placement'; 
         $current_version = $this->version;
 
         // Obtener información de la última versión desde GitHub
