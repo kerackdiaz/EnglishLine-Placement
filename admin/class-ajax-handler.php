@@ -550,10 +550,10 @@ class EnglishLine_Test_Ajax_Handler {
         ));
     }
 
+
     /**
      * Actualiza el plugin desde GitHub
      */
-
     public function update_from_github() {
         // Verificar nonce para seguridad
         if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'englishline_update_plugin')) {
@@ -577,125 +577,154 @@ class EnglishLine_Test_Ajax_Handler {
         require_once(ABSPATH . 'wp-admin/includes/file.php');
         require_once(ABSPATH . 'wp-admin/includes/plugin.php');
         require_once(ABSPATH . 'wp-admin/includes/class-wp-upgrader.php');
-        require_once(ABSPATH . 'wp-admin/includes/plugin-install.php');
+        require_once(ABSPATH . 'wp-admin/includes/misc.php');
         
-        // Información sobre el plugin actual
-        $plugin_slug = 'englishline-test';
-        $plugin_file = $plugin_slug . '/' . $plugin_slug . '.php';
-        $plugins_dir = WP_PLUGIN_DIR;
-        $plugin_dir = $plugins_dir . '/' . $plugin_slug;
+        // Inicializar WP_Filesystem
+        WP_Filesystem();
         
         // Iniciar buffer para capturar cualquier salida
         ob_start();
         
-        // Configurar el actualizador
-        $skin = new WP_Ajax_Upgrader_Skin();
-        $upgrader = new Plugin_Upgrader($skin);
+        // Datos sobre nuestro plugin
+        $plugin_slug = 'englishline-test';
+        $plugin_file = $plugin_slug . '/' . $plugin_slug . '.php';
         
-        // 1. Descargar el archivo ZIP
-        $download_file = download_url($download_url);
-        
-        if (is_wp_error($download_file)) {
-            $error = ob_get_clean();
-            wp_send_json_error(array(
-                'message' => 'Error al descargar: ' . $download_file->get_error_message(),
-                'debug_info' => $error
+        try {
+            // 1. Verificar si el plugin está activo y desactivarlo temporalmente
+            $was_active = is_plugin_active($plugin_file);
+            if ($was_active) {
+                deactivate_plugins($plugin_file);
+            }
+            
+            // 2. Usar el actualizador de plugins de WordPress
+            $upgrader = new Plugin_Upgrader(new Automatic_Upgrader_Skin());
+            
+            // Desactivar cualquier redirección después de la activación
+            add_filter('wp_redirect', '__return_false');
+            
+            // 3. Descargar y extraer el plugin directamente usando el actualizador
+            $result = $upgrader->install($download_url, array(
+                'overwrite_package' => true,    // Sobrescribir archivos existentes
+                'destination' => WP_PLUGIN_DIR, // Directorio de plugins
+                'clear_destination' => true,    // Limpiar directorio destino
+                'hook_extra' => array(          // Información extra para los hooks
+                    'type' => 'plugin',
+                    'action' => 'update',
+                    'plugin' => $plugin_file
+                )
             ));
+            
+            // 4. Reactivar el plugin si estaba activo anteriormente
+            if ($was_active && !is_wp_error($result)) {
+                $activate_result = activate_plugin($plugin_file);
+                if (is_wp_error($activate_result)) {
+                    throw new Exception('Plugin actualizado pero error al reactivar: ' . $activate_result->get_error_message());
+                }
+            }
+            
+            // Si hay algún error durante la instalación
+            if (is_wp_error($result)) {
+                throw new Exception($result->get_error_message());
+            }
+            
+            if ($result === false) {
+                throw new Exception('No se pudo instalar el plugin por un error desconocido.');
+            }
+            
+            // Capturar cualquier mensaje y limpiar buffer
+            $debug_info = ob_get_clean();
+            
+            // Éxito
+            wp_send_json_success(array(
+                'message' => 'El plugin se ha actualizado correctamente' . ($was_active ? ' y reactivado' : ''),
+                'debug_info' => $debug_info
+            ));
+            
+        } catch (Exception $e) {
+            // Capturar el debug y limpiar buffer
+            $debug_info = ob_get_clean();
+            
+            // Si falló pero el plugin estaba activo, intentar reactivarlo
+            if (isset($was_active) && $was_active) {
+                activate_plugin($plugin_file);
+            }
+            
+            // Enviar error con información de depuración
+            wp_send_json_error(array(
+                'message' => 'Error: ' . $e->getMessage(),
+                'debug_info' => $debug_info
+            ));
+        }
+    }
+    
+    /**
+     * Limpia un directorio sin eliminarlo
+     */
+    private function clear_directory($dir) {
+        if (!is_dir($dir)) {
             return;
         }
         
-        // 2. Desactivar el plugin actual (si está activo)
-        $was_active = is_plugin_active($plugin_file);
-        if ($was_active) {
-            deactivate_plugins($plugin_file);
-        }
+        $files = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
+        );
         
-        // 3. Eliminar el directorio del plugin existente
-        if (file_exists($plugin_dir)) {
-            $removed = $upgrader->clear_destination($plugin_dir);
-            if (is_wp_error($removed)) {
-                $error = ob_get_clean();
-                wp_send_json_error(array(
-                    'message' => 'Error al eliminar versión anterior: ' . $removed->get_error_message(),
-                    'debug_info' => $error
-                ));
-                return;
+        foreach ($files as $fileinfo) {
+            $path = $fileinfo->getRealPath();
+            
+            if ($fileinfo->isDir()) {
+                rmdir($path);
+            } else {
+                unlink($path);
+            }
+        }
+    }
+    
+    /**
+     * Copia todos los archivos de un directorio a otro
+     */
+    private function copy_directory($src, $dst) {
+        $dir = opendir($src);
+        @mkdir($dst);
+        
+        while (false !== ($file = readdir($dir))) {
+            if (($file != '.') && ($file != '..')) {
+                if (is_dir($src . '/' . $file)) {
+                    $this->copy_directory($src . '/' . $file, $dst . '/' . $file);
+                } else {
+                    copy($src . '/' . $file, $dst . '/' . $file);
+                }
             }
         }
         
-        // 4. Extraer el archivo ZIP
-        $unzip_result = unzip_file($download_file, $plugins_dir);
-        
-        // Eliminar el archivo ZIP temporal
-        @unlink($download_file);
-        
-        if (is_wp_error($unzip_result)) {
-            $error = ob_get_clean();
-            wp_send_json_error(array(
-                'message' => 'Error al extraer: ' . $unzip_result->get_error_message(),
-                'debug_info' => $error
-            ));
+        closedir($dir);
+    }
+    
+    /**
+     * Elimina un directorio y todo su contenido
+     */
+    private function remove_directory($dir) {
+        if (!is_dir($dir)) {
             return;
         }
         
-        // 5. Buscar el directorio extraído (GitHub añade un sufijo)
-        $extracted_dir = false;
-        $dir_handle = opendir($plugins_dir);
-        while (false !== ($entry = readdir($dir_handle))) {
-            if (strpos($entry, 'kerackdiaz-EnglishLine-Placement') === 0) {
-                $extracted_dir = $plugins_dir . '/' . $entry;
-                break;
-            }
-        }
-        closedir($dir_handle);
+        $files = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST
+        );
         
-        if (!$extracted_dir) {
-            $error = ob_get_clean();
-            wp_send_json_error(array(
-                'message' => 'No se pudo encontrar el directorio extraído',
-                'debug_info' => $error
-            ));
-            return;
-        }
-        
-        // 6. Renombrar el directorio extraído
-        if ($extracted_dir != $plugin_dir) {
-            if (file_exists($plugin_dir)) {
-                // En caso de que aún exista por algún motivo
-                $upgrader->clear_destination($plugin_dir);
-            }
-            $renamed = rename($extracted_dir, $plugin_dir);
-            if (!$renamed) {
-                $error = ob_get_clean();
-                wp_send_json_error(array(
-                    'message' => 'No se pudo renombrar el directorio del plugin',
-                    'debug_info' => $error
-                ));
-                return;
+        foreach ($files as $fileinfo) {
+            $path = $fileinfo->getRealPath();
+            
+            if ($fileinfo->isDir()) {
+                rmdir($path);
+            } else {
+                unlink($path);
             }
         }
         
-        // 7. Reactivar el plugin si estaba activo
-        if ($was_active) {
-            $activate_result = activate_plugin($plugin_file);
-            if (is_wp_error($activate_result)) {
-                $error = ob_get_clean();
-                wp_send_json_error(array(
-                    'message' => 'Error al reactivar: ' . $activate_result->get_error_message(),
-                    'debug_info' => $error
-                ));
-                return;
-            }
-        }
-        
-        // Capturar cualquier mensaje y limpiar buffer
-        $debug_info = ob_get_clean();
-        
-        // Éxito
-        wp_send_json_success(array(
-            'message' => 'El plugin se ha actualizado correctamente' . ($was_active ? ' y reactivado' : ''),
-            'debug_info' => $debug_info
-        ));
+        rmdir($dir);
     }
 
 /**
