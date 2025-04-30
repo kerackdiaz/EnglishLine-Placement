@@ -1,13 +1,9 @@
 (function ($) {
     'use strict';
 
-    // Asegurarse de que el namespace exista
     window.EnglishLineTest = window.EnglishLineTest || {};
 
     EnglishLineTest.FormEvents = {
-        /**
-         * Vincula eventos a los elementos
-         */
         bindEvents: function () {
             let self = this;
 
@@ -55,6 +51,7 @@
 
                 switch (action) {
                     case 'edit':
+                        $question.children('.form-options-container').remove();
                         EnglishLineTest.FormUI.toggleQuestionEdit.call(self, $question);
                         break;
 
@@ -81,11 +78,77 @@
                 let field = $(e.currentTarget).data('field');
                 let value = $(e.currentTarget).val();
 
-                if (field === 'required' || field === 'case_sensitive') {
+                if (field === 'required' || field === 'caseSensitive' || field === 'isGradable') {
                     value = $(e.currentTarget).prop('checked');
                 }
 
                 EnglishLineTest.FormData.updateQuestionData.call(self, sectionIndex, questionIndex, field, value);
+                
+                if (field === 'text' && $question.attr('data-question-type') === 'paragraph') {
+                    $question.find('.paragraph-preview').html(value || 'Párrafo informativo');
+                }
+                
+                if (field === 'paragraphAlignment') {
+                    $question.find('.paragraph-preview')
+                        .removeClass('align-left align-center align-right align-justify')
+                        .addClass('align-' + value);
+                }
+                
+                if (field === 'isGradable') {
+                    $question.find('.grading-specific-fields').toggle(value);
+                }
+                
+                if (field === 'correctOption' && value >= 0) {
+                    $question.find('.option-correct').prop('checked', false);
+                    $question.find(`.form-option[data-option-index="${value}"] .option-correct`).prop('checked', true);
+                }
+            });
+
+            self.$sectionsContainer.on('change', '.option-correct', function(e) {
+                let $option = $(e.currentTarget).closest('.form-option');
+                let $question = $option.closest('.form-question');
+                let $section = $question.closest('.form-section');
+                let sectionIndex = $section.data('section-index');
+                let questionIndex = $question.data('question-index');
+                let optionIndex = $option.data('option-index');
+                let isChecked = $(e.currentTarget).prop('checked');
+                let questionType = $question.attr('data-question-type');
+
+                if (isChecked) {
+                    EnglishLineTest.FormData.updateQuestionData.call(
+                        self, sectionIndex, questionIndex, 'isGradable', true
+                    );
+                }
+                
+                if ((questionType === 'radio' || questionType === 'select') && isChecked) {
+                    $question.find('.option-correct').not($(e.currentTarget)).prop('checked', false);
+                    
+                    EnglishLineTest.FormData.updateQuestionData.call(
+                        self, sectionIndex, questionIndex, 'correctOption', optionIndex
+                    );
+                    
+                    $question.find('.form-option').each(function(i, el) {
+                        let optIdx = $(el).data('option-index');
+                        EnglishLineTest.FormData.updateOptionData.call(
+                            self, sectionIndex, questionIndex, optIdx, 'correct', optIdx === optionIndex
+                        );
+                    });
+                } 
+                else if (questionType === 'checkbox') {
+                    EnglishLineTest.FormData.updateOptionData.call(
+                        self, sectionIndex, questionIndex, optionIndex, 'correct', isChecked
+                    );
+                    
+                    let correctOptions = [];
+                    $question.find('.option-correct:checked').each(function() {
+                        let optIdx = $(this).closest('.form-option').data('option-index');
+                        correctOptions.push(optIdx);
+                    });
+                    
+                    EnglishLineTest.FormData.updateQuestionData.call(
+                        self, sectionIndex, questionIndex, 'correctOptions', correctOptions
+                    );
+                }
             });
 
             self.$sectionsContainer.on('click', '.add-option-btn', function(e) {
@@ -122,23 +185,13 @@
                 EnglishLineTest.FormData.updateOptionData.call(self, sectionIndex, questionIndex, optionIndex, 'text', value);
             });
 
-            self.$sectionsContainer.on('change', '.question-type-select', function(e) {
-                let $question = $(e.currentTarget).closest('.form-question');
-                let $section = $question.closest('.form-section');
-                let sectionIndex = $section.data('section-index');
-                let questionIndex = $question.data('question-index');
-                let newType = $(e.currentTarget).val();
-
-                EnglishLineTest.FormData.changeQuestionType.call(self, sectionIndex, questionIndex, newType);
-            });
-
-            $(document).on('input', '.form-question-field[data-field="cloze_text"]', function() {
+            $(document).on('input', '.form-question-field[data-field="clozeText"]', function() {
                 let $question = $(this).closest('.form-question');
                 let sectionIndex = $question.closest('.form-section').data('section-index');
                 let questionIndex = $question.data('question-index');
                 let clozeText = $(this).val();
 
-                EnglishLineTest.FormData.updateQuestionData.call(self, sectionIndex, questionIndex, 'cloze_text', clozeText);
+                EnglishLineTest.FormData.updateQuestionData.call(self, sectionIndex, questionIndex, 'clozeText', clozeText);
                 self.updateClozePreview.call(self, $question, clozeText);
                 self.generateClozeAnswerFields.call(self, $question, clozeText, sectionIndex, questionIndex);
             });
@@ -152,15 +205,8 @@
                 let sectionIndex = $section.data('section-index');
                 let questionIndex = $question.data('question-index');
                 let $preview = $button.closest('.image-selector').find('.image-preview');
-                let $imageIdInput = $button.closest('.image-selector').find('input[data-field="image_id"]');
+                let $imageIdInput = $button.closest('.image-selector').find('input[data-field="imageId"]');
                 let $removeBtn = $button.closest('.image-selector').find('.remove-image-btn');
-                
-                // Registrar el estado actual para depuración
-                console.log('Seleccionando imagen para la pregunta:', {
-                    sectionIndex: sectionIndex,
-                    questionIndex: questionIndex,
-                    currentImageId: $imageIdInput.val()
-                });
                 
                 if (!window.imageMediaFrame) {
                     window.imageMediaFrame = wp.media({
@@ -171,27 +217,19 @@
                     });
                 }
                 
-                // Reiniciar las selecciones
                 window.imageMediaFrame.off('select');
                 
-                // Cuando se seleccione una imagen
                 window.imageMediaFrame.on('select', function() {
                     let attachment = window.imageMediaFrame.state().get('selection').first().toJSON();
-                    console.log('Imagen seleccionada:', attachment);
                     
-                    // Actualizar el preview
                     $preview.html(`<img src="${attachment.url}" style="max-width:100px;max-height:100px;">`);
-                    
-                    // Establecer el valor del ID y mostrar botón de eliminar
                     $imageIdInput.val(attachment.id);
                     $removeBtn.show();
                     
-                    // Crucial: actualizar los datos del modelo inmediatamente
                     EnglishLineTest.FormData.updateQuestionData.call(
-                        self, sectionIndex, questionIndex, 'image_id', attachment.id
+                        self, sectionIndex, questionIndex, 'imageId', attachment.id
                     );
 
-                    // Disparar evento de cambio para cualquier otro listener
                     $(document).trigger('englishline_question_image_selected', [
                         sectionIndex, questionIndex, attachment
                     ]);
@@ -200,7 +238,6 @@
                 window.imageMediaFrame.open();
             });
             
-            // Manejar la eliminación de imágenes
             self.$sectionsContainer.on('click', '.remove-image-btn', function(e) {
                 e.preventDefault();
                 
@@ -210,85 +247,109 @@
                 let sectionIndex = $section.data('section-index');
                 let questionIndex = $question.data('question-index');
                 let $preview = $button.closest('.image-selector').find('.image-preview');
-                let $imageIdInput = $button.closest('.image-selector').find('input[data-field="image_id"]');
+                let $imageIdInput = $button.closest('.image-selector').find('input[data-field="imageId"]');
                 
-                // Limpiar el preview y el valor
                 $preview.html('<div class="no-image">Sin imagen</div>');
                 $imageIdInput.val('');
                 $button.hide();
                 
-                // Actualizar los datos del modelo
                 EnglishLineTest.FormData.updateQuestionData.call(
-                    self, sectionIndex, questionIndex, 'image_id', ''
+                    self, sectionIndex, questionIndex, 'imageId', ''
                 );
-                
+            });
+            
+            self.$sectionsContainer.on('input', '.form-question-field[data-field="correctAnswer"]', function() {
+                let $question = $(this).closest('.form-question');
+                let sectionIndex = $question.closest('.form-section').data('section-index');
+                let questionIndex = $question.data('question-index');
+                let value = $(this).val();
+
+                EnglishLineTest.FormData.updateQuestionData.call(
+                    self, sectionIndex, questionIndex, 'correctAnswer', value
+                );
+            });
+            
+            self.$sectionsContainer.on('change', '.form-question-field[data-field="correctValue"]', function() {
+                let $question = $(this).closest('.form-question');
+                let sectionIndex = $question.closest('.form-section').data('section-index');
+                let questionIndex = $question.data('question-index');
+                let value = $(this).val() === "true";
+
+                EnglishLineTest.FormData.updateQuestionData.call(
+                    self, sectionIndex, questionIndex, 'correctValue', value
+                );
             });
         },
 
-        /**
-         * Actualiza la vista previa de los textos Cloze
-         */
         updateClozePreview: function($question, clozeText) {
-            let previewText = clozeText.replace(/\[(.*?)\]/g, '<span class="cloze-blank">[$1]</span>');
-            $question.find('.form-question-content').html(`
-                <div class="form-question-text">${$question.find('.form-question-field[data-field="text"]').val() || 'Completa el texto'}</div>
-                <div class="cloze-preview">${previewText}</div>
-            `);
+            if (!clozeText) clozeText = 'Texto con [espacios] para completar';
+            let clozePreview = clozeText.replace(/\[(.*?)\]/g, '<span class="cloze-blank">[$1]</span>');
+            $question.find('.cloze-preview').html(clozePreview);
         },
 
-        /**
-         * Genera campos de respuesta para textos Cloze
-         */
         generateClozeAnswerFields: function($question, clozeText, sectionIndex, questionIndex) {
-            let matches = [];
+            let blanks = [];
             let match;
             let regex = /\[(.*?)\]/g;
-
+            
             while ((match = regex.exec(clozeText)) !== null) {
-                matches.push({
-                    index: matches.length,
-                    word: match[1]
-                });
+                blanks.push(match[1]);
             }
+            
+            EnglishLineTest.FormData.updateQuestionData.call(
+                this, sectionIndex, questionIndex, 'correctFills', blanks
+            );
+        },
 
-            let $answersList = $question.find('.cloze-answers-list');
-            if (!$answersList.length) {
-                $answersList = $('<div class="cloze-answers-list"></div>');
-                $question.find('.form-question-config').append(`
-                    <div class="form-field">
-                        <label>Respuestas correctas</label>
-                        <div class="cloze-answers-list"></div>
-                        <p class="field-help">Define las respuestas aceptadas para cada espacio.</p>
-                    </div>
-                `);
-                $answersList = $question.find('.cloze-answers-list');
+         initOptionsForQuestion: function($question, sectionIndex, questionIndex) {
+            let questionData = EnglishLineTest.FormData.getQuestionData(sectionIndex, questionIndex);
+            
+            if (!questionData && EnglishLineTest.FormBuilder?.sectionsData?.[sectionIndex]?.questions?.[questionIndex]) {
+                questionData = EnglishLineTest.FormBuilder.sectionsData[sectionIndex].questions[questionIndex];
             }
+            
+            if (!questionData?.options?.length) return;
+            
+            $question.find('.form-options-container, .form-field-options, .add-option-btn').remove();
+        
+            let $qConfig = $question.find('.form-question-config');
+            $question.addClass('editing');
+            $qConfig.show();
+            
+            let $optionsField = $qConfig.find('.form-field').filter(function() {
+                return $(this).find('label').text().trim() === 'Opciones';
+            });
+            
+            if ($optionsField.length === 0) {
+                $optionsField = $('<div class="form-field"><label>Opciones</label></div>');
+                $qConfig.append($optionsField);
+            }
+            
+            let $optionsContainer = $('<div class="form-options-container"></div>');
+            $optionsField.append($optionsContainer);
+            
 
-            $answersList.empty();
-
-            if (matches.length > 0) {
-                matches.forEach(function(item) {
-                    $answersList.append(`
-                        <div class="cloze-answer-item" data-blank-index="${item.index}">
-                            <div class="cloze-answer-word">"${item.word}"</div>
-                            <div class="cloze-answer-field">
-                                <label>Respuestas aceptadas (separadas por coma):</label>
-                                <input type="text" class="cloze-answer-input" value="${item.word}"
-                                    data-blank-index="${item.index}">
-                            </div>
-                        </div>
-                    `);
+            $.each(questionData.options, function(index, option) {
+                if (EnglishLineTest.FormUI?.createOptionElement) {
+                    let $option = EnglishLineTest.FormUI.createOptionElement(option, index);
+                    $optionsContainer.append($option);
+                    
+                    if (option.correct) {
+                        $option.find('.option-correct').prop('checked', true);
+                    }
+                }
+            });
+            
+            $optionsContainer.after('<button type="button" class="add-option-btn">+ Añadir opción</button>');
+            
+            let tipo = $question.data('question-type');
+            if ((tipo === 'radio' || tipo === 'select') && questionData.correctOption >= 0) {
+                $optionsContainer.find('.option-correct').prop('checked', false);
+                $optionsContainer.find(`.form-option[data-option-index="${questionData.correctOption}"] .option-correct`).prop('checked', true);
+            } else if (tipo === 'checkbox' && Array.isArray(questionData.correctOptions)) {
+                questionData.correctOptions.forEach(function(optIndex) {
+                    $optionsContainer.find(`.form-option[data-option-index="${optIndex}"] .option-correct`).prop('checked', true);
                 });
-
-                let question = EnglishLineTest.FormData.sectionsData[sectionIndex].questions[questionIndex];
-                question.answers = matches.map(item => ({
-                    word: item.word,
-                    accepted: [item.word]
-                }));
-
-                $answersList.closest('.form-field').show();
-            } else {
-                $answersList.closest('.form-field').hide();
             }
         }
     };

@@ -1,73 +1,121 @@
 (function ($) {
     'use strict';
 
-    // Asegurarse de que el namespace exista
     window.EnglishLineTest = window.EnglishLineTest || {};
 
     EnglishLineTest.FormDragAndDrop = {
-        /**
-         * Inicializa el sistema de arrastrar y soltar
-         */
         initSortable: function () {
             let self = this;
 
-            // Hacer arrastrable los componentes de la barra lateral
-            self.$formComponents.draggable({
-                helper: 'clone',
-                revert: 'invalid',
-                start: function (event, ui) {
-                    self.draggedComponent = $(this).data('type');
-                    self.$sectionsContainer.addClass('drag-highlight');
-                },
-                stop: function () {
-                    self.draggedComponent = null;
-                    self.$sectionsContainer.removeClass('drag-highlight');
-                }
-            });
+            try {
+                $('.form-component').draggable({
+                    helper: 'clone',
+                    revert: 'invalid',
+                    zIndex: 100
+                });
 
-            // Contenedor de secciones sortable y droppable SOLO para componentes de SECCIÓN
-            self.$sectionsContainer.sortable({
-                items: '.form-section',
-                handle: '.form-section-header',
-                placeholder: 'form-section-placeholder',
-                tolerance: 'pointer',
-                opacity: 0.7,
-                update: function () {
-                    EnglishLineTest.FormUtils.updateSectionIndices.call(self);
-                }
-            }).droppable({
-                accept: '.form-component[data-type="section"]',
-                tolerance: 'pointer',
-                hoverClass: 'droppable-active',
-                drop: function (event, ui) {
-                    if ($(ui.draggable).data('type') === 'section') {
+                $('#form-sections-container').droppable({
+                    accept: '.form-component[data-type="section"]',
+                    hoverClass: 'drop-hover',
+                    drop: function (event, ui) {
                         EnglishLineTest.FormData.addSection.call(self);
                     }
-                }
-            });
+                }).sortable({
+                    handle: '.form-section-header',
+                    items: '.form-section',
+                    placeholder: 'form-section-placeholder',
+                    tolerance: 'pointer',
+                    update: function(event, ui) {
+                        self.updateSectionIndices();
+                    }
+                });
 
-            // Configuración para hacer droppable los contenedores de preguntas
-            $(document).on('mouseover', '.form-questions-container', function () {
-                let $container = $(this);
-                if (!$container.hasClass('droppable-initialized')) {
-                    $container.droppable({
-                        accept: '.form-component:not([data-type="section"])',
-                        tolerance: 'pointer',
-                        hoverClass: 'droppable-active',
-                        drop: function (event, ui) {
-                            console.log("DROP EVENT DETECTED!");
-                            let type = $(ui.draggable).data('type');
-                            let $section = $(this).closest('.form-section');
-                            let sectionIndex = $section.data('section-index');
-
-                            if (type !== 'section') {
-                                console.log("Adding question of type:", type, "to section:", sectionIndex);
+                $(document).on('englishline_section_added', function(e, sectionIndex) {
+                    let $container = $('.form-section[data-section-index="' + sectionIndex + '"] .form-questions-container');
+                    if ($container.length) {
+                        $container.droppable({
+                            accept: '.form-component:not([data-type="section"])',
+                            hoverClass: 'drop-hover',
+                            drop: function (e, ui) {
+                                let type = $(ui.draggable).data('type');
                                 EnglishLineTest.FormData.addQuestion.call(self, sectionIndex, type);
                             }
+                        }).sortable({
+                            items: '.form-question',
+                            handle: '.form-question-header',
+                            placeholder: 'form-question-placeholder',
+                            connectWith: '.form-questions-container',
+                            tolerance: 'pointer',
+                            update: function(event, ui) {
+                                self.updateQuestionIndices($(this).closest('.form-section').data('section-index'));
+                            }
+                        });
+                    }
+                });
+                
+                $('.form-questions-container').each(function() {
+                    let $container = $(this);
+                    let sectionIndex = $container.closest('.form-section').data('section-index');
+                    
+                    $container.droppable({
+                        accept: '.form-component:not([data-type="section"])',
+                        hoverClass: 'drop-hover',
+                        drop: function (e, ui) {
+                            let type = $(ui.draggable).data('type');
+                            EnglishLineTest.FormData.addQuestion.call(self, sectionIndex, type);
                         }
-                    }).addClass('droppable-initialized');
+                    }).sortable({
+                        items: '.form-question',
+                        handle: '.form-question-header',
+                        placeholder: 'form-question-placeholder',
+                        connectWith: '.form-questions-container',
+                        tolerance: 'pointer',
+                        update: function(event, ui) {
+                            self.updateQuestionIndices($(this).closest('.form-section').data('section-index'));
+                        }
+                    });
+                });
+            } catch (error) {
+                console.error('Error al inicializar sistema de arrastrar y soltar:', error);
+            }
+        },
+
+        updateSectionIndices: function() {
+            let sections = [];
+            $('#form-sections-container .form-section').each(function(index) {
+                const oldIndex = $(this).attr('data-section-index');
+                const newIndex = index;
+                
+                $(this).attr('data-section-index', newIndex);
+                
+                const section = EnglishLineTest.FormData.getSection(oldIndex);
+                if (section) {
+                    sections[newIndex] = section;
                 }
             });
+            
+            EnglishLineTest.FormData.sections = sections;
+            EnglishLineTest.FormData.saveFormData();
         },
+
+        updateQuestionIndices: function(sectionIndex) {
+            const section = EnglishLineTest.FormData.getSection(sectionIndex);
+            if (!section) return;
+
+            const questions = [];
+            $(`.form-section[data-section-index="${sectionIndex}"] .form-questions-container .form-question`).each(function(index) {
+                const oldIndex = $(this).attr('data-question-index');
+                const newIndex = index;
+                
+                $(this).attr('data-question-index', newIndex);
+                
+                if (section.questions && section.questions[oldIndex]) {
+                    questions[newIndex] = section.questions[oldIndex];
+                }
+            });
+            
+            section.questions = questions;
+            EnglishLineTest.FormData.saveFormData();
+        }
     };
 })(jQuery);

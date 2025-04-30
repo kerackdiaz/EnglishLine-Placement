@@ -54,6 +54,8 @@ class EnglishLine_Test_Admin
         wp_enqueue_script('englishline-test-form-builder-drag-and-drop', plugin_dir_url(__FILE__) . 'js/components/form-builder-drag-and-drop.js', array('jquery', 'jquery-ui-sortable', 'jquery-ui-draggable', 'jquery-ui-droppable', 'englishline-test-form-builder-ui', 'englishline-test-form-builder-data', 'englishline-test-form-builder-utils'), $this->version, false);
         wp_enqueue_script('englishline-test-form-builder-events', plugin_dir_url(__FILE__) . 'js/components/form-builder-events.js', array('jquery', 'englishline-test-form-builder-ui', 'englishline-test-form-builder-data', 'englishline-test-form-builder-utils'), $this->version, false);
 
+        wp_enqueue_script('englishline-test-debug-helper', plugin_dir_url(__FILE__) . 'js/modules/debug-helper.js', array('jquery'), $this->version, true);
+
         wp_enqueue_script('englishline-test-form-builder', plugin_dir_url(__FILE__) . 'js/modules/form-builder.js', array(
             'jquery',
             'jquery-ui-sortable',

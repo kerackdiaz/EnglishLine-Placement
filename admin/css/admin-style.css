@@ -405,6 +405,11 @@ div#form-preview {
     flex: 1;
 }
 
+.form-option .option-container {
+    display: flex;
+    gap: 10px;
+}
+
 .add-option-btn,
 .remove-option-btn {
     padding: 5px 10px;
@@ -531,7 +536,7 @@ div#form-preview {
 
 .preview-question-header {
     display: flex;
-    justify-content: space-between;
+    gap: 10px;
     margin-bottom: 10px;
 }
 

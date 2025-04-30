@@ -1,5 +1,4 @@
 <?php
-
 /**
  * Muestra la vista detallada de un resultado
  */
@@ -12,6 +11,13 @@ if (!defined('ABSPATH')) {
 global $wpdb;
 global $form_structure;
 global $answers;
+
+// Habilitar debug si no está activado
+if (!defined('WP_DEBUG') || !WP_DEBUG) {
+    define('WP_DEBUG', true);
+    define('WP_DEBUG_LOG', true);
+    define('WP_DEBUG_DISPLAY', false);
+}
 
 // Obtener el ID del resultado de la URL
 $result_id = isset($_GET['result_id']) ? intval($_GET['result_id']) : 0;
@@ -36,44 +42,64 @@ if (!$result) {
     wp_die(__('Resultado no encontrado.', 'englishline-test'));
 }
 
-// Función para decodificar secuencias Unicode
-function decode_unicode_sequences($text)
-{
-    if (!is_string($text)) {
-        return $text;
+// Debug: Registrar datos crudos
+error_log('ENGLISHLINE_DEBUG - Raw form_structure: ' . print_r($result->form_structure, true));
+error_log('ENGLISHLINE_DEBUG - Raw form_data: ' . print_r($result->form_data, true));
+
+// Procesar form_structure
+$form_structure = [];
+if (!empty($result->form_structure)) {
+    $form_structure = json_decode($result->form_structure, true, 512, JSON_UNESCAPED_UNICODE);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        error_log('ENGLISHLINE_DEBUG - Error decodificando form_structure: ' . json_last_error_msg());
+        $form_structure = [];
     }
-
-    // Reemplazar secuencias \uXXXX (4 dígitos hexadecimales)
-    $text = preg_replace_callback('/u([0-9a-fA-F]{4})/', function ($matches) {
-        return mb_convert_encoding(pack('H*', $matches[1]), 'UTF-8', 'UCS-2BE');
-    }, $text);
-
-    // También manejar secuencias como \u00f3 sin barras inversas
-    $text = preg_replace_callback('/\\\\u([0-9a-fA-F]{4})/', function ($matches) {
-        return mb_convert_encoding(pack('H*', $matches[1]), 'UTF-8', 'UCS-2BE');
-    }, $text);
-
-    return $text;
+    if (is_array($form_structure)) {
+        if (isset($form_structure[0]) && !isset($form_structure['sections'])) {
+            $form_structure = ['sections' => $form_structure];
+        }
+        error_log('ENGLISHLINE_DEBUG - Processed form_structure: ' . print_r($form_structure, true));
+    } else {
+        error_log('ENGLISHLINE_DEBUG - form_structure no es un array: ' . print_r($form_structure, true));
+        $form_structure = [];
+    }
 }
 
-// Función recursiva para procesar todo el array de datos
-function process_text_encoding(&$data)
-{
-    if (is_array($data)) {
-        foreach ($data as $key => &$value) {
-            if (is_array($value)) {
-                process_text_encoding($value);
-            } elseif (is_string($value)) {
-                $value = decode_unicode_sequences($value);
+// Procesar form_data
+$user_data = [];
+$answers = [];
+$form_data = json_decode($result->form_data, true, 512, JSON_UNESCAPED_UNICODE);
+if (json_last_error() !== JSON_ERROR_NONE) {
+    error_log('ENGLISHLINE_DEBUG - Error decodificando form_data: ' . json_last_error_msg());
+    $form_data = [];
+}
+
+if (is_array($form_data)) {
+    if (isset($form_data['user_info'])) {
+        $user_data = $form_data['user_info'];
+    }
+
+    if (isset($form_data['sections']) && is_array($form_data['sections'])) {
+        foreach ($form_data['sections'] as $section_index => $section) {
+            if (isset($section['questions']) && is_array($section['questions'])) {
+                foreach ($section['questions'] as $question_index => $question) {
+                    if (isset($question['id']) && !empty($question['id'])) {
+                        $question_id = "question_{$section_index}_{$question_index}";
+                        if (isset($question['answer'])) {
+                            $answers[$question_id] = $question['answer'];
+                        }
+                    }
+                }
             }
         }
-    } elseif (is_string($data)) {
-        $data = decode_unicode_sequences($data);
     }
-    return $data;
+    error_log('ENGLISHLINE_DEBUG - Processed user_data: ' . print_r($user_data, true));
+    error_log('ENGLISHLINE_DEBUG - Processed answers: ' . print_r($answers, true));
+} else {
+    error_log('ENGLISHLINE_DEBUG - form_data no es un array: ' . print_r($form_data, true));
 }
 
-// Procesar envío del formulario de calificación si existe
+// Procesar envío del formulario de calificación
 $message = '';
 $message_type = '';
 
@@ -82,40 +108,53 @@ if (isset($_POST['englishline_save_review']) && check_admin_referer('englishline
     $comments = isset($_POST['comments']) ? sanitize_textarea_field($_POST['comments']) : '';
     $status = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : 'reviewed';
 
-    // Validar score
     if ($score !== null && ($score < 0 || $score > 100)) {
         $score = null;
     }
 
-    // Recopilar calificaciones individuales si se enviaron
-    $individual_scores = [];
-    if (isset($_POST['question_score']) && is_array($_POST['question_score'])) {
-        foreach ($_POST['question_score'] as $question_id => $q_score) {
-            // Solo incluir si el checkbox correspondiente está marcado
-            if (isset($_POST['include_in_score'][$question_id])) {
-                $q_score = intval($q_score);
-                if ($q_score >= 0 && $q_score <= 100) {
-                    $individual_scores[$question_id] = $q_score;
+    // Procesar estados de correcta/incorrecta por pregunta
+    $individual_corrections = [];
+    if (isset($_POST['is_correct']) && is_array($_POST['is_correct'])) {
+        foreach ($_POST['is_correct'] as $question_id => $value) {
+            $individual_corrections[$question_id] = (bool)$value;
+        }
+
+        // Calcular la calificación total si no se proporcionó manualmente
+        if ($score === null) {
+            $total_gradable = 0;
+            $correct_count = 0;
+
+            if (isset($form_structure['sections'])) {
+                foreach ($form_structure['sections'] as $section_index => $section) {
+                    if (isset($section['questions'])) {
+                        foreach ($section['questions'] as $question_index => $question) {
+                            if (isset($question['type']) && ($question['type'] === 'title' || $question['type'] === 'paragraph')) {
+                                continue;
+                            }
+                            if (!isset($question['isGradable']) || !$question['isGradable']) {
+                                continue;
+                            }
+                            $total_gradable++;
+                            $question_id = "question_{$section_index}_{$question_index}";
+                            if (isset($individual_corrections[$question_id]) && $individual_corrections[$question_id]) {
+                                $correct_count++;
+                            }
+                        }
+                    }
                 }
             }
-        }
-    
-        // Calcular score automáticamente si no se especificó uno
-        if ($score === null && !empty($individual_scores)) {
-            $total_questions = count($individual_scores);
-            $sum_scores = array_sum($individual_scores);
-            $score = $total_questions > 0 ? round($sum_scores / $total_questions, 2) : null;
+
+            $score = $total_gradable > 0 ? round(($correct_count / $total_gradable) * 100, 2) : 0;
         }
     }
 
-    // Actualizar en la base de datos
     $updated = $wpdb->update(
         $wpdb->prefix . 'englishline_results',
         array(
             'score' => $score,
             'feedback' => $comments,
             'status' => $status,
-            'individual_scores' => json_encode($individual_scores),
+            'individual_scores' => json_encode($individual_corrections),
             'reviewed_at' => current_time('mysql'),
             'reviewer_id' => get_current_user_id()
         ),
@@ -128,7 +167,6 @@ if (isset($_POST['englishline_save_review']) && check_admin_referer('englishline
         $message = __('Calificación guardada exitosamente.', 'englishline-test');
         $message_type = 'success';
 
-        // Recargar datos actualizados
         $result = $wpdb->get_row($wpdb->prepare(
             "SELECT r.*, f.title as form_title, f.form_data as form_structure, u.display_name as user_name, u.user_email as user_email_from_wp
              FROM {$wpdb->prefix}englishline_results r
@@ -142,14 +180,10 @@ if (isset($_POST['englishline_save_review']) && check_admin_referer('englishline
         $message_type = 'error';
     }
     if ($status === 'approved' || $status === 'failed') {
-        // Cargar el helper de email
         require_once plugin_dir_path(dirname(dirname(__FILE__))) . 'includes/helpers/class-email-helper.php';
         $email_helper = new Email_Helper();
-
-        // Intentar enviar el correo
         $email_sent = $email_helper->send_grade_notification($result_id, $score, $comments);
 
-        // Actualizar mensaje con información del correo
         if ($email_sent) {
             $message .= ' ' . __('Notificación enviada por correo electrónico.', 'englishline-test');
         } else {
@@ -158,67 +192,12 @@ if (isset($_POST['englishline_save_review']) && check_admin_referer('englishline
     }
 }
 
-// Decodificar los datos del formulario
-$form_data = json_decode($result->form_data, true);
-$form_data = process_text_encoding($form_data);
-
-$user_data = [];
-$answers = [];
-
-if (is_array($form_data)) {
-    if (isset($form_data['user_data'])) {
-        $user_data = $form_data['user_data'];
-    }
-
-    if (isset($form_data['form_data'])) {
-        $answers = $form_data['form_data'];
-    }
-}
-
-// Obtener estructura del formulario para mostrar las preguntas
-$form_structure = [];
-if (!empty($result->form_structure)) {
-    $raw_structure = $result->form_structure;
-
-    // Limpiar el JSON antes de decodificar
-    if (substr($raw_structure, 0, 1) === '"' && substr($raw_structure, -1) === '"') {
-        $raw_structure = substr($raw_structure, 1, -1);
-    }
-
-    if (strpos($raw_structure, '\\\\') !== false) {
-        $raw_structure = stripslashes($raw_structure);
-    }
-
-
-    // Decodificar
-    $form_structure = json_decode($raw_structure, true);
-
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        $form_structure = json_decode(stripslashes($raw_structure), true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-        }
-    }
-
-    if (is_array($form_structure)) {
-
-        $form_structure = process_text_encoding($form_structure);
-
-        // Si es un array simple, envolverlo en 'sections'
-        if (isset($form_structure[0]) && !isset($form_structure['sections'])) {
-            $form_structure = ['sections' => $form_structure];
-        }
-
-       
-    } 
-}
-
-
-// Cargar las calificaciones individuales si existen
-$individual_scores = [];
+// Cargar las correcciones individuales si existen
+$individual_corrections = [];
 if (!empty($result->individual_scores)) {
-    $individual_scores = json_decode($result->individual_scores, true);
-    if (!is_array($individual_scores)) {
-        $individual_scores = [];
+    $individual_corrections = json_decode($result->individual_scores, true);
+    if (!is_array($individual_corrections)) {
+        $individual_corrections = [];
     }
 }
 
@@ -228,18 +207,18 @@ function get_question_type_label($type)
     $types = [
         'text' => 'Respuesta corta',
         'textarea' => 'Respuesta larga',
-        'select' => 'Desplegable',
+        'select' => 'Selección desplegable',
         'radio' => 'Selección única',
         'checkbox' => 'Selección múltiple',
         'image' => 'Imagen',
-        'cloze' => 'Texto con huecos',
-        'ordering' => 'Ordenación',
+        'cloze' => 'Completar huecos',
+        'ordering' => 'Ejercicio de ordenación',
         'drag-drop' => 'Arrastrar y soltar',
         'matching' => 'Emparejar',
-        'true-false' => 'Verdadero/Falso'
+        'true-false' => 'Verdadero/Falso',
+        'paragraph' => 'Párrafo informativo'
     ];
-
-    return isset($types[$type]) ? $types[$type] : $type;
+    return isset($types[$type]) ? $types[$type] : ucfirst($type);
 }
 
 // Función para renderizar la respuesta del usuario de forma legible
@@ -253,11 +232,11 @@ function render_user_answer($answer, $question_type, $question = null)
         if ($question_type == 'checkbox') {
             echo '<ul>';
             foreach ($answer as $item) {
-                // Buscar el texto de la opción según el índice
-                $option_text = $item;
+                $option_text = is_array($item) && isset($item['text']) ? $item['text'] : $item;
+                $value = is_array($item) && isset($item['value']) ? $item['value'] : $item;
                 if (isset($question['options']) && is_array($question['options'])) {
                     foreach ($question['options'] as $opt_idx => $opt) {
-                        if ($opt_idx == $item && isset($opt['text'])) {
+                        if ((string)$opt_idx === (string)$value && isset($opt['text'])) {
                             $option_text = $opt['text'];
                             break;
                         }
@@ -269,55 +248,34 @@ function render_user_answer($answer, $question_type, $question = null)
         } elseif ($question_type == 'ordering') {
             echo '<ol>';
             foreach ($answer as $item) {
-                // Inicialmente asumimos que el valor es el índice
-                $option_text = $item;
-
-                // Para preguntas de ordenación
-                if (isset($question['items_text'])) {
-                    $items_array = explode("\n", $question['items_text']);
-                    $items_array = array_map('trim', $items_array);
-                    if (isset($items_array[$item])) {
-                        $option_text = $items_array[$item];
+                $option_text = is_array($item) && isset($item['text']) ? $item['text'] : $item;
+                $value = is_array($item) && isset($item['value']) ? $item['value'] : $item;
+                if (empty($option_text) && isset($question['itemsText']) && is_string($question['itemsText'])) {
+                    $items_array = array_map('trim', explode("\n", $question['itemsText']));
+                    if (isset($items_array[$value])) {
+                        $option_text = $items_array[$value];
                     }
                 }
-                else if (isset($question['options']) && is_array($question['options'])) {
-                    if (isset($question['options'][$item]['text'])) {
-                        $option_text = $question['options'][$item]['text'];
-                    } else {
-                        foreach ($question['options'] as $opt_idx => $opt) {
-                            if ((string)$opt_idx === (string)$item && isset($opt['text'])) {
-                                $option_text = $opt['text'];
-                                break;
-                            }
-                        }
-                    }
-                }
-
                 echo '<li>' . esc_html($option_text) . '</li>';
             }
             echo '</ol>';
         } elseif ($question_type == 'cloze') {
-            if (isset($question['cloze_text']) && !empty($question['cloze_text'])) {
-                $cloze_text = $question['cloze_text'];
+            if (isset($question['clozeText']) && !empty($question['clozeText'])) {
+                $cloze_text = $question['clozeText'];
                 $blank_count = 0;
-
-                $filled_text = preg_replace_callback('/\[blank\]/', function ($matches) use ($answer, &$blank_count) {
+                $pattern = strpos($cloze_text, '[blank]') !== false ? '/\[blank\]/' : '/\[(.*?)\]/';
+                $filled_text = preg_replace_callback($pattern, function ($matches) use ($answer, &$blank_count) {
                     $user_answer = isset($answer[$blank_count]) ? '<span class="user-answer">' . esc_html($answer[$blank_count]) . '</span>' : '______';
                     $blank_count++;
                     return $user_answer;
                 }, $cloze_text);
-
                 echo '<div class="cloze-text-filled">' . $filled_text . '</div>';
-                echo '<div class="cloze-answers">';
-                echo '<strong>' . __('Respuestas:', 'englishline-test') . '</strong>';
-                echo '<ol>';
+                echo '<div class="cloze-answers"><strong>' . __('Respuestas:', 'englishline-test') . '</strong><ol>';
                 foreach ($answer as $blank_answer) {
                     echo '<li>' . esc_html($blank_answer) . '</li>';
                 }
-                echo '</ol>';
-                echo '</div>';
+                echo '</ol></div>';
             } else {
-                // Fallback si no tenemos el texto completo
                 echo '<ul>';
                 foreach ($answer as $idx => $blank) {
                     echo '<li>' . __('Hueco', 'englishline-test') . ' ' . ($idx + 1) . ': ' . esc_html($blank) . '</li>';
@@ -330,15 +288,24 @@ function render_user_answer($answer, $question_type, $question = null)
     } else {
         if (($question_type == 'select' || $question_type == 'radio') && isset($question['options'])) {
             $option_text = $answer;
+            if (is_array($answer) && isset($answer['text'])) {
+                $option_text = $answer['text'];
+                $value = isset($answer['value']) ? $answer['value'] : $answer;
+            } else {
+                $value = $answer;
+            }
             foreach ($question['options'] as $opt_idx => $opt) {
-                if ((string)$opt_idx === (string)$answer && isset($opt['text'])) {
+                if ((string)$opt_idx === (string)$value && isset($opt['text'])) {
                     $option_text = $opt['text'];
                     break;
                 }
             }
             echo '<p>' . esc_html($option_text) . '</p>';
+        } elseif ($question_type == 'true-false') {
+            $tf_value = $answer === 'Verdadero' || $answer === true ? __('Verdadero', 'englishline-test') : __('Falso', 'englishline-test');
+            echo '<p>' . esc_html($tf_value) . '</p>';
         } else {
-            echo '<p>' . esc_html($answer) . '</p>';
+            echo '<p>' . esc_html($answer !== null ? $answer : '') . '</p>';
         }
     }
 }
@@ -358,24 +325,28 @@ function display_question_image($image_id)
 function find_question_in_structure($section_index, $question_index)
 {
     global $form_structure;
-
     if (isset($form_structure['sections'][$section_index]['questions'][$question_index])) {
         return $form_structure['sections'][$section_index]['questions'][$question_index];
     }
-
     return null;
 }
 
 $total_questions = 0;
+$total_gradable_questions = 0;
 if (isset($form_structure['sections'])) {
     foreach ($form_structure['sections'] as $section) {
         if (isset($section['questions'])) {
-            $total_questions += count($section['questions']);
+            $total_questions += count(array_filter($section['questions'], function ($q) {
+                return !isset($q['type']) || ($q['type'] !== 'title' && $q['type'] !== 'paragraph');
+            }));
+            $total_gradable_questions += count(array_filter($section['questions'], function ($q) {
+                return isset($q['isGradable']) && $q['isGradable'] && !isset($q['type']) || ($q['type'] !== 'title' && $q['type'] !== 'paragraph');
+            }));
         }
     }
 }
 
-$value_per_question = $total_questions > 0 ? round(100 / $total_questions, 2) : 0;
+$value_per_question = $total_gradable_questions > 0 ? round(100 / $total_gradable_questions, 2) : 0;
 
 $user_name = '';
 if (!empty($user_data['first_name'])) {
@@ -388,7 +359,6 @@ if (!empty($user_data['first_name'])) {
     $user_name = 'Usuario anónimo';
 }
 
-// Determinar el email del usuario
 $user_email = '';
 if (!empty($result->user_email)) {
     $user_email = $result->user_email;
@@ -398,13 +368,11 @@ if (!empty($result->user_email)) {
     $user_email = $user_data['email'];
 }
 
-// Calcular el tiempo transcurrido
 $time_spent = '';
 if (!empty($result->start_time) && !empty($result->end_time)) {
     $start = new DateTime($result->start_time);
     $end = new DateTime($result->end_time);
     $diff = $start->diff($end);
-
     if ($diff->h > 0) {
         $time_spent = $diff->format('%h horas, %i minutos, %s segundos');
     } elseif ($diff->i > 0) {
@@ -515,8 +483,8 @@ if (!empty($result->start_time) && !empty($result->end_time)) {
                     <div class="result-review-row">
                         <div class="result-review-field">
                             <label for="score"><?php _e('Calificación global (0-100):', 'englishline-test'); ?></label>
-                            <input type="number" id="score" name="score" min="0" max="100" value="<?php echo $result->score !== null ? esc_attr($result->score) : ''; ?>" placeholder="Calificación automática">
-                            <p class="description"><?php _e('Deja en blanco para calcular automáticamente en base a las calificaciones individuales.', 'englishline-test'); ?></p>
+                            <input type="number" id="score" name="score" min="0" max="100" value="<?php echo $result->score !== null ? esc_attr($result->score) : ''; ?>" readonly>
+                            <p class="description"><?php _e('Calculada automáticamente según las respuestas marcadas como correctas.', 'englishline-test'); ?></p>
                         </div>
 
                         <div class="result-review-field">
@@ -536,73 +504,122 @@ if (!empty($result->start_time) && !empty($result->end_time)) {
                     </div>
 
                     <div class="result-answers">
-                        <h3><?php _e('Respuestas y Calificación Individual', 'englishline-test'); ?></h3>
+                        <h3><?php _e('Respuestas y Evaluación', 'englishline-test'); ?></h3>
 
                         <?php if (isset($form_structure['sections'])): ?>
                             <?php foreach ($form_structure['sections'] as $section_index => $section): ?>
                                 <div class="result-section">
                                     <div class="result-section-header">
                                         <div class="result-section-title">
-                                            <?php echo esc_html($section['title']); ?>
+                                            <?php echo esc_html($section['title'] ?? 'Sección ' . ($section_index + 1)); ?>
                                         </div>
                                         <div class="result-section-info">
-                                            <?php echo sprintf(__('Valor por pregunta: %.2f puntos', 'englishline-test'), $value_per_question); ?>
+                                            <?php echo sprintf(__('Valor por pregunta graduable: %.2f puntos', 'englishline-test'), $value_per_question); ?>
                                         </div>
                                     </div>
 
                                     <?php if (isset($section['questions'])): ?>
                                         <?php foreach ($section['questions'] as $question_index => $question): ?>
                                             <?php
-                                            if (isset($question['type']) && $question['type'] === 'title') {
+                                            if (isset($question['type']) && ($question['type'] === 'title' || $question['type'] === 'paragraph')) {
                                                 continue;
                                             }
 
                                             $question_id = "question_{$section_index}_{$question_index}";
                                             $user_answer = isset($answers[$question_id]) ? $answers[$question_id] : null;
-                                            $question_score = isset($individual_scores[$question_id]) ? $individual_scores[$question_id] : '';
 
                                             $has_correct_answer = false;
                                             $is_correct = false;
 
                                             if (
                                                 isset($question['correct_answer']) ||
-                                                (isset($question['options']) && is_array($question['options']) &&
-                                                    array_filter($question['options'], function ($opt) {
-                                                        return isset($opt['correct']) && $opt['correct'];
-                                                    }))
+                                                isset($question['correctAnswer']) ||
+                                                isset($question['correctOption']) ||
+                                                isset($question['correctOptions']) ||
+                                                isset($question['correctFills']) ||
+                                                isset($question['correctOrder']) ||
+                                                isset($question['correctValue'])
                                             ) {
                                                 $has_correct_answer = true;
 
-                                                if (isset($question['correct_answer'])) {
-                                                    $is_correct = ($user_answer == $question['correct_answer']);
+                                                // Calcular si la respuesta es correcta automáticamente
+                                                if ($question['type'] === 'checkbox') {
+                                                    $correct_answer = isset($question['correctOptions']) ? $question['correctOptions'] : [];
+                                                    if (is_array($user_answer) && is_array($correct_answer)) {
+                                                        $user_values = array_map(function ($item) {
+                                                            return is_array($item) && isset($item['value']) ? $item['value'] : $item;
+                                                        }, $user_answer);
+                                                        $is_correct = count(array_diff($correct_answer, $user_values)) === 0 &&
+                                                                      count(array_diff($user_values, $correct_answer)) === 0;
+                                                    }
+                                                } elseif ($question['type'] === 'ordering') {
+                                                    $correct_answer = isset($question['correctOrder']) ? $question['correctOrder'] : [];
+                                                    if (is_array($user_answer) && is_array($correct_answer)) {
+                                                        $user_values = array_map(function ($item) {
+                                                            return is_array($item) && isset($item['value']) ? $item['value'] : $item;
+                                                        }, $user_answer);
+                                                        $is_correct = $user_values === $correct_answer;
+                                                    }
+                                                } elseif ($question['type'] === 'cloze') {
+                                                    $correct_answer = isset($question['correctFills']) ? $question['correctFills'] : [];
+                                                    $case_sensitive = isset($question['caseSensitive']) && $question['caseSensitive'];
+                                                    if (is_array($user_answer) && is_array($correct_answer)) {
+                                                        $is_correct = true;
+                                                        foreach ($correct_answer as $i => $correct) {
+                                                            $user_value = isset($user_answer[$i]) ? $user_answer[$i] : '';
+                                                            if ($case_sensitive) {
+                                                                if ($user_value !== $correct) {
+                                                                    $is_correct = false;
+                                                                    break;
+                                                                }
+                                                            } else {
+                                                                if (strtolower($user_value) !== strtolower($correct)) {
+                                                                    $is_correct = false;
+                                                                    break;
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                } elseif ($question['type'] === 'true-false') {
+                                                    $correct_answer = isset($question['correctValue']) ? $question['correctValue'] : false;
+                                                    $is_correct = ($user_answer === 'Verdadero' && $correct_answer === true) ||
+                                                                  ($user_answer === 'Falso' && $correct_answer === false);
+                                                } elseif ($question['type'] === 'select' || $question['type'] === 'radio') {
+                                                    $correct_answer = isset($question['correctOption']) ? $question['correctOption'] : null;
+                                                    if ($correct_answer !== null) {
+                                                        $user_value = is_array($user_answer) && isset($user_answer['value']) ? $user_answer['value'] : $user_answer;
+                                                        $is_correct = (string)$user_value === (string)$correct_answer;
+                                                    }
                                                 } else {
-                                                    $correct_options = array_filter($question['options'], function ($opt) {
-                                                        return isset($opt['correct']) && $opt['correct'];
-                                                    });
-
-                                                    if (!empty($correct_options)) {
-                                                        $correct_values = array_map(function ($opt) {
-                                                            return $opt['value'];
-                                                        }, $correct_options);
-
-                                                        if (is_array($user_answer)) {
-                                                            $is_correct = count(array_diff($correct_values, $user_answer)) === 0;
+                                                    $correct_answer = isset($question['correctAnswer']) ? $question['correctAnswer'] :
+                                                                     (isset($question['correct_answer']) ? $question['correct_answer'] : null);
+                                                    $case_sensitive = isset($question['caseSensitive']) && $question['caseSensitive'];
+                                                    if ($correct_answer !== null) {
+                                                        if ($case_sensitive) {
+                                                            $is_correct = $user_answer === $correct_answer;
                                                         } else {
-                                                            $is_correct = in_array($user_answer, $correct_values);
+                                                            $is_correct = strtolower(trim($user_answer)) === strtolower(trim($correct_answer));
                                                         }
                                                     }
                                                 }
                                             }
 
+                                            // Si hay una corrección manual, usarla
+                                            if (isset($individual_corrections[$question_id])) {
+                                                $is_correct = $individual_corrections[$question_id];
+                                            }
+
                                             $question_class = $has_correct_answer ?
                                                 ($is_correct ? 'result-correct' : 'result-incorrect') : '';
+                                            if (!isset($question['type'])) {
+                                                $question['type'] = 'text';
+                                            }
                                             ?>
-
                                             <div class="result-question <?php echo esc_attr($question_class); ?>">
                                                 <div class="result-question-header">
                                                     <div class="result-question-number"><?php echo $question_index + 1; ?>.</div>
                                                     <div class="result-question-text">
-                                                        <?php echo esc_html($question['text']); ?>
+                                                        <?php echo esc_html($question['text'] ?? ''); ?>
                                                     </div>
                                                     <div class="result-question-type">
                                                         <span class="badge badge-<?php echo $has_correct_answer ? 'primary' : 'info'; ?>">
@@ -612,71 +629,91 @@ if (!empty($result->start_time) && !empty($result->end_time)) {
                                                 </div>
 
                                                 <div class="result-question-content">
-                                                    <?php if ($question['type'] === 'image' && !empty($question['image_id'])): ?>
-                                                        <?php display_question_image($question['image_id']); ?>
+                                                    <?php if (isset($question['type']) && $question['type'] === 'image' && !empty($question['imageId'])): ?>
+                                                        <?php display_question_image($question['imageId']); ?>
                                                     <?php endif; ?>
 
                                                     <div class="result-answer">
                                                         <div class="result-answer-label"><?php _e('Respuesta del usuario:', 'englishline-test'); ?></div>
                                                         <?php if ($user_answer !== null): ?>
-                                                            <?php
-                                                            if ($question['type'] === 'true-false') {
-                                                                $tf_value = $user_answer ? __('Verdadero', 'englishline-test') : __('Falso', 'englishline-test');
-                                                                echo '<p>' . esc_html($tf_value) . '</p>';
-                                                            } else {
-                                                                render_user_answer($user_answer, $question['type'], $question);
-                                                            }
-                                                            ?>
+                                                            <?php render_user_answer($user_answer, $question['type'], $question); ?>
                                                         <?php else: ?>
                                                             <p class="empty-answer"><?php _e('Sin respuesta', 'englishline-test'); ?></p>
                                                         <?php endif; ?>
                                                     </div>
 
-                                                    <?php
-                                                    if ($has_correct_answer && $question['type'] !== 'true-false'):
-                                                    ?>
+                                                    <?php if ($has_correct_answer): ?>
                                                         <div class="result-correct-answer">
                                                             <div class="result-answer-label"><?php _e('Respuesta correcta:', 'englishline-test'); ?></div>
                                                             <?php
-                                                            if (isset($question['correct_answer'])) {
-                                                                echo '<p>' . esc_html($question['correct_answer']) . '</p>';
-                                                            } elseif (isset($question['options'])) {
-                                                                $correct_options = array_filter($question['options'], function ($opt) {
-                                                                    return isset($opt['correct']) && $opt['correct'];
-                                                                });
-
-                                                                if (!empty($correct_options)) {
-                                                                    echo '<ul>';
-                                                                    foreach ($correct_options as $option) {
-                                                                        echo '<li>' . esc_html($option['text']) . '</li>';
+                                                            if ($question['type'] === 'checkbox' && isset($question['correctOptions'])) {
+                                                                echo '<ul>';
+                                                                foreach ($question['correctOptions'] as $value) {
+                                                                    $option_text = $value;
+                                                                    if (isset($question['options']) && is_array($question['options'])) {
+                                                                        foreach ($question['options'] as $opt_idx => $opt) {
+                                                                            if ((string)$opt_idx === (string)$value && isset($opt['text'])) {
+                                                                                $option_text = $opt['text'];
+                                                                                break;
+                                                                            }
+                                                                        }
                                                                     }
-                                                                    echo '</ul>';
+                                                                    echo '<li>' . esc_html($option_text) . '</li>';
                                                                 }
+                                                                echo '</ul>';
+                                                            } elseif ($question['type'] === 'ordering' && isset($question['correctOrder'])) {
+                                                                echo '<ol>';
+                                                                foreach ($question['correctOrder'] as $value) {
+                                                                    $option_text = $value;
+                                                                    if (isset($question['itemsText']) && is_string($question['itemsText'])) {
+                                                                        $items_array = array_map('trim', explode("\n", $question['itemsText']));
+                                                                        if (isset($items_array[$value])) {
+                                                                            $option_text = $items_array[$value];
+                                                                        }
+                                                                    }
+                                                                    echo '<li>' . esc_html($option_text) . '</li>';
+                                                                }
+                                                                echo '</ol>';
+                                                            } elseif ($question['type'] === 'cloze' && isset($question['correctFills'])) {
+                                                                echo '<ul>';
+                                                                foreach ($question['correctFills'] as $fill) {
+                                                                    echo '<li>' . esc_html($fill) . '</li>';
+                                                                }
+                                                                echo '</ul>';
+                                                            } elseif ($question['type'] === 'true-false' && isset($question['correctValue'])) {
+                                                                $tf_value = $question['correctValue'] ? __('Verdadero', 'englishline-test') : __('Falso', 'englishline-test');
+                                                                echo '<p>' . esc_html($tf_value) . '</p>';
+                                                            } elseif (($question['type'] === 'select' || $question['type'] === 'radio') && isset($question['correctOption'])) {
+                                                                $option_text = $question['correctOption'];
+                                                                if (isset($question['options']) && is_array($question['options'])) {
+                                                                    foreach ($question['options'] as $opt_idx => $opt) {
+                                                                        if ((string)$opt_idx === (string)$question['correctOption'] && isset($opt['text'])) {
+                                                                            $option_text = $opt['text'];
+                                                                            break;
+                                                                        }
+                                                                    }
+                                                                }
+                                                                echo '<p>' . esc_html($option_text) . '</p>';
+                                                            } elseif (isset($question['correctAnswer']) || isset($question['correct_answer'])) {
+                                                                $correct_answer = isset($question['correctAnswer']) ? $question['correctAnswer'] : $question['correct_answer'];
+                                                                echo '<p>' . esc_html($correct_answer) . '</p>';
                                                             }
                                                             ?>
                                                         </div>
+
+                                                        <?php if (isset($question['isGradable']) && $question['isGradable']): ?>
+                                                            <div class="result-question-evaluation">
+                                                                <label>
+                                                                    <input type="checkbox"
+                                                                           name="is_correct[<?php echo esc_attr($question_id); ?>]"
+                                                                           value="1"
+                                                                           class="is-correct-checkbox"
+                                                                           <?php checked($is_correct); ?>>
+                                                                    <?php _e('Marcar como correcta', 'englishline-test'); ?>
+                                                                </label>
+                                                            </div>
+                                                        <?php endif; ?>
                                                     <?php endif; ?>
-
-                                                    <div class="result-question-score">
-                                                        <label for="question-score-<?php echo esc_attr($question_id); ?>"><?php _e('Calificación:', 'englishline-test'); ?></label>
-                                                        <div class="score-controls">
-                                                            <input type="number" id="question-score-<?php echo esc_attr($question_id); ?>"
-                                                                name="question_score[<?php echo esc_attr($question_id); ?>]"
-                                                                min="0" max="100"
-                                                                value="<?php echo esc_attr($question_score); ?>"
-                                                                class="question-score-input"
-                                                                placeholder="0-100"
-                                                                <?php echo (isset($question['type']) && $question['type'] === 'textarea') ? 'disabled' : ''; ?>>
-
-                                                            <label class="include-in-score">
-                                                                <input type="checkbox"
-                                                                    name="include_in_score[<?php echo esc_attr($question_id); ?>]"
-                                                                    class="include-score-checkbox"
-                                                                    <?php echo (isset($question['type']) && $question['type'] === 'textarea') ? '' : 'checked'; ?>>
-                                                                <?php _e('Incluir en calificación', 'englishline-test'); ?>
-                                                            </label>
-                                                        </div>
-                                                    </div>
                                                 </div>
                                             </div>
                                         <?php endforeach; ?>
@@ -693,7 +730,6 @@ if (!empty($result->start_time) && !empty($result->end_time)) {
                     <div class="result-actions">
                         <button type="button" id="calculate-score" class="button"><?php _e('Calcular calificación automática', 'englishline-test'); ?></button>
                         <button type="submit" name="englishline_save_review" class="button button-primary"><?php _e('Guardar calificación', 'englishline-test'); ?></button>
-
                         <?php if ($result->status === 'approved' || $result->status === 'failed'): ?>
                             <button type="submit" name="englishline_send_email" class="button"><?php _e('Reenviar email de calificación', 'englishline-test'); ?></button>
                         <?php endif; ?>
@@ -706,76 +742,36 @@ if (!empty($result->start_time) && !empty($result->end_time)) {
 
 <script>
     jQuery(document).ready(function($) {
-        $('.include-score-checkbox').on('change', function() {
-            let scoreInput = $(this).closest('.score-controls').find('.question-score-input');
-            if($(this).is(':checked')) {
-                scoreInput.prop('disabled', false);
-            } else {
-                scoreInput.prop('disabled', true);
-                scoreInput.val(''); 
-            }
-        });
-        
-        $('.include-score-checkbox').trigger('change');
-        
-        // Calcular calificación automática
         $('#calculate-score').on('click', function() {
-            let totalQuestions = 0;
-            let totalScore = 0;
+            let totalGradable = <?php echo $total_gradable_questions; ?>;
+            let correctCount = 0;
 
-            $('.question-score-input').each(function() {
-                let checkbox = $(this).closest('.score-controls').find('.include-score-checkbox');
-                if(checkbox.is(':checked')) {
-                    let score = parseInt($(this).val());
-                    if (!isNaN(score)) {
-                        totalScore += score;
-                        totalQuestions++;
-                    }
+            $('.is-correct-checkbox').each(function() {
+                if ($(this).is(':checked')) {
+                    correctCount++;
                 }
             });
 
-            if (totalQuestions > 0) {
-                let averageScore = Math.round(totalScore / totalQuestions);
-                $('#score').val(averageScore);
-
-                if (averageScore >= 60) {
+            if (totalGradable > 0) {
+                let score = Math.round((correctCount / totalGradable) * 100);
+                $('#score').val(score);
+                if (score >= 60) {
                     $('#status').val('approved');
                 } else {
                     $('#status').val('failed');
                 }
             } else {
-                alert('Por favor, califica al menos una pregunta primero o selecciona qué preguntas incluir en la calificación.');
+                alert('No hay preguntas graduables para calcular la calificación.');
             }
         });
 
-
-        $('form').on('submit', function(e) {
-            let valid = true;
-            let errorMessage = '';
-
-            $('.question-score-input').each(function() {
-                if(!$(this).prop('disabled')) {
-                    let value = $(this).val();
-                    if (value !== '') {
-                        let score = parseInt(value);
-                        if (isNaN(score) || score < 0 || score > 100) {
-                            valid = false;
-                            errorMessage = 'Las calificaciones deben ser números entre 0 y 100.';
-                            $(this).addClass('error');
-                            return false;
-                        }
-                    }
-                }
-            });
-
-            if (!valid) {
-                alert(errorMessage);
-                e.preventDefault();
+        $('.is-correct-checkbox').on('change', function() {
+            let $question = $(this).closest('.result-question');
+            if ($(this).is(':checked')) {
+                $question.removeClass('result-incorrect').addClass('result-correct');
+            } else {
+                $question.removeClass('result-correct').addClass('result-incorrect');
             }
-        });
-
-        $('.question-score-input').on('input', function() {
-            $(this).removeClass('error');
         });
     });
 </script>

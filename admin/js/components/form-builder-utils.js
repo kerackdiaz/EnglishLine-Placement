@@ -1,80 +1,84 @@
 (function ($) {
-    'use strict';
+  'use strict';
 
-    // Asegurarse de que el namespace exista
-    window.EnglishLineTest = window.EnglishLineTest || {};
+  window.EnglishLineTest = window.EnglishLineTest || {};
 
-    EnglishLineTest.FormUtils = {
-        /**
-         * Reindexar las opciones de una pregunta
-         *
-         * @param {number} sectionIndex - Índice de la sección
-         * @param {number} questionIndex - Índice de la pregunta
-         */
-        reindexOptions: function (sectionIndex, questionIndex) {
-            let $section = this.$sectionsContainer.find('.form-section[data-section-index="' + sectionIndex + '"]');
-            let $question = $section.find('.form-question[data-question-index="' + questionIndex + '"]');
+  EnglishLineTest.FormUtils = {
+    getDefaultQuestionTitle: function(type) {
+      const labels = {
+        'text': 'Pregunta de texto corto',
+        'textarea': 'Pregunta de texto largo',
+        'select': 'Pregunta de selección',
+        'radio': 'Pregunta de opción única',
+        'checkbox': 'Pregunta de selección múltiple',
+        'title': 'Título de sección',
+        'paragraph': 'Texto explicativo',
+        'cloze': 'Ejercicio de completar huecos',
+        'ordering': 'Ejercicio de ordenar elementos',
+        'image': 'Descripción de imagen',
+        'true-false': 'Pregunta de verdadero/falso'
+      };
+      
+      return labels[type] || 'Nueva pregunta';
+    },
 
-            $question.find('.form-option').each(function (index) {
-                $(this).attr('data-option-index', index);
-            });
-        },
-
-        /**
-         * Actualiza los índices de las secciones después de reordenar o eliminar
-         */
-        updateSectionIndices: function () {
-            let self = this;
-            let newSectionsData = [];
-
-            this.$sectionsContainer.find('.form-section').each(function (index) {
-                $(this).attr('data-section-index', index);
-                newSectionsData.push(self.sectionsData[$(this).data('section-index')]);
-            });
-            this.sectionsData = newSectionsData;
-        },
-
-        /**
-         * Actualiza los índices de las preguntas después de reordenar o eliminar
-         *
-         * @param {number} sectionIndex - Índice de la sección
-         */
-        updateQuestionIndices: function (sectionIndex) {
-            let self = this;
-            let $section = this.$sectionsContainer.find('.form-section[data-section-index="' + sectionIndex + '"]');
-            let newQuestions = [];
-
-            $section.find('.form-question').each(function (index) {
-                $(this).attr('data-question-index', index);
-                newQuestions.push(self.sectionsData[sectionIndex].questions[$(this).data('question-index')]);
-            });
-            this.sectionsData[sectionIndex].questions = newQuestions;
-        },
-
-        /**
-         * Obtiene un título predeterminado para un tipo de pregunta
-         *
-         * @param {string} type - Tipo de pregunta
-         * @return {string} Título predeterminado
-         */
-        getDefaultQuestionTitle: function (type) {
-            let titles = {
-                'text': 'Pregunta de texto corto',
-                'textarea': 'Pregunta de texto largo',
-                'select': 'Pregunta de selección',
-                'radio': 'Pregunta de opción única',
-                'checkbox': 'Pregunta de opción múltiple',
-                'file': 'Subida de archivo',
-                'title': 'Título',
-                'image': 'Describa la imagen',
-                'cloze': 'Complete el texto',
-                'drag-drop': 'Arrastre los elementos a su lugar correcto',
-                'ordering': 'Ordene los elementos correctamente',
-                'matching': 'Empareje los elementos de ambas columnas',
-                'true-false': 'Indique si la afirmación es verdadera o falsa'
-            };
-
-            return titles[type] || 'Nueva pregunta';
+    updateSectionIndices: function() {
+      let self = this;
+      let newSectionsData = [];
+      
+      this.$sectionsContainer.find('.form-section').each(function(index) {
+        let oldIndex = parseInt($(this).data('section-index'));
+        
+        $(this).attr('data-section-index', index);
+        
+        if (self.sectionsData[oldIndex]) {
+          newSectionsData[index] = self.sectionsData[oldIndex];
         }
-    };
+      });
+      
+      this.sectionsData = newSectionsData;
+      EnglishLineTest.FormData.saveFormData();
+    },
+    
+    updateQuestionIndices: function(sectionIndex) {
+      let self = this;
+      let newQuestionsData = [];
+      let $section = this.$sectionsContainer.find('.form-section[data-section-index="' + sectionIndex + '"]');
+      
+      $section.find('.form-question').each(function(index) {
+        let oldIndex = parseInt($(this).data('question-index'));
+        
+        $(this).attr('data-question-index', index);
+        
+        if (self.sectionsData[sectionIndex] && 
+            self.sectionsData[sectionIndex].questions && 
+            self.sectionsData[sectionIndex].questions[oldIndex]) {
+          newQuestionsData[index] = self.sectionsData[sectionIndex].questions[oldIndex];
+        }
+      });
+      
+      if (this.sectionsData[sectionIndex]) {
+        this.sectionsData[sectionIndex].questions = newQuestionsData;
+      }
+      EnglishLineTest.FormData.saveFormData();
+    },
+    
+    reindexOptions: function(sectionIndex, questionIndex) {
+      let self = this;
+      let question = this.sectionsData[sectionIndex]?.questions[questionIndex];
+      if (!question || !question.options) return;
+      
+      let $section = this.$sectionsContainer.find('.form-section[data-section-index="' + sectionIndex + '"]');
+      let $question = $section.find('.form-question[data-question-index="' + questionIndex + '"]');
+      
+      question.options.forEach((option, idx) => {
+        option.text = "Opción " + (idx + 1);
+      });
+      
+      $question.find('.form-option').each(function(idx) {
+        $(this).attr('data-option-index', idx);
+        $(this).find('.option-text').val("Opción " + (idx + 1));
+      });
+    }
+  };
 })(jQuery);

@@ -1,17 +1,8 @@
 <?php
-
-/**
- * Formulario para crear/editar test
- *
- * @package EnglishLineTest
- */
-
-// Verificar que no se accede directamente a este archivo
 if (!defined('ABSPATH')) {
     die('Acceso directo no permitido');
 }
 
-// Obtener datos del formulario si es una edición
 $form = null;
 $form_fields = '[]';
 $form_id = 0;
@@ -19,7 +10,6 @@ $form_title = '';
 $form_description = '';
 $form_status = 'draft';
 
-// Verificar si estamos editando un formulario existente
 if (isset($_GET['form_id']) && intval($_GET['form_id']) > 0) {
     $form_id = intval($_GET['form_id']);
     global $wpdb;
@@ -34,22 +24,18 @@ if (isset($_GET['form_id']) && intval($_GET['form_id']) > 0) {
         $form_description = $form->description;
         $form_status = isset($form->status) ? $form->status : 'draft';
 
-        // Busca el campo con los datos del formulario - el nombre del campo puede variar según tu esquema
         if (isset($form->fields)) {
             $form_fields = $form->fields;
         } elseif (isset($form->form_data)) {
             $form_fields = $form->form_data;
         }
     } else {
-        // Si el formulario no existe, redirigir a la lista
         wp_redirect(admin_url('admin.php?page=englishline-test-forms'));
         exit;
     }
 }
 
-// Determinar el modo (new o edit)
 $mode = ($form_id > 0) ? 'edit' : 'new';
-
 ?>
 <div class="wrap englishline-admin-wrap">
     <div class="englishline-admin-header">
@@ -83,67 +69,70 @@ $mode = ($form_id > 0) ? 'edit' : 'new';
                                 <div class="component-group">
                                     <h3 class="component-group-title"><?php esc_html_e('Estructura', 'englishline-test'); ?></h3>
 
-                                    <div class="form-component" data-type="section">
+                                    <div class="form-component" data-type="section" data-gradable="false" data-structural="true">
                                         <span class="form-component-icon dashicons dashicons-category"></span>
                                         <span class="form-component-label"><?php esc_html_e('Nueva Sección', 'englishline-test'); ?></span>
                                     </div>
 
-                                    <div class="form-component" data-type="title">
+                                    <div class="form-component" data-type="title" data-gradable="false" data-structural="true">
                                         <span class="form-component-icon dashicons dashicons-heading"></span>
                                         <span class="form-component-label"><?php esc_html_e('Título', 'englishline-test'); ?></span>
                                     </div>
+                                    
+                                    <div class="form-component" data-type="paragraph" data-gradable="false" data-structural="true">
+                                        <span class="form-component-icon dashicons dashicons-editor-paragraph"></span>
+                                        <span class="form-component-label"><?php esc_html_e('Párrafo', 'englishline-test'); ?></span>
+                                    </div>
                                 </div>
 
-                                <!-- Entradas básicas -->
                                 <div class="component-group">
                                     <h3 class="component-group-title"><?php esc_html_e('Entradas básicas', 'englishline-test'); ?></h3>
 
-                                    <div class="form-component" data-type="text">
+                                    <div class="form-component" data-type="text" data-gradable="true" data-requires-value="true">
                                         <span class="form-component-icon dashicons dashicons-editor-textcolor"></span>
                                         <span class="form-component-label"><?php esc_html_e('Texto corto', 'englishline-test'); ?></span>
                                     </div>
 
-                                    <div class="form-component" data-type="textarea">
+                                    <div class="form-component" data-type="textarea" data-gradable="true" data-requires-value="true">
                                         <span class="form-component-icon dashicons dashicons-editor-paragraph"></span>
                                         <span class="form-component-label"><?php esc_html_e('Texto largo', 'englishline-test'); ?></span>
                                     </div>
 
-                                    <div class="form-component" data-type="select">
+                                    <div class="form-component" data-type="select" data-gradable="true" data-has-options="true">
                                         <span class="form-component-icon dashicons dashicons-arrow-down"></span>
                                         <span class="form-component-label"><?php esc_html_e('Desplegable', 'englishline-test'); ?></span>
                                     </div>
 
-                                    <div class="form-component" data-type="radio">
+                                    <div class="form-component" data-type="radio" data-gradable="true" data-has-options="true">
                                         <span class="form-component-icon dashicons dashicons-yes-alt"></span>
                                         <span class="form-component-label"><?php esc_html_e('Opción única', 'englishline-test'); ?></span>
                                     </div>
 
-                                    <div class="form-component" data-type="checkbox">
+                                    <div class="form-component" data-type="checkbox" data-gradable="true" data-has-options="true" data-multiple="true">
                                         <span class="form-component-icon dashicons dashicons-yes"></span>
                                         <span class="form-component-label"><?php esc_html_e('Opción múltiple', 'englishline-test'); ?></span>
                                     </div>
                                 </div>
 
-                                <!-- Componentes interactivos -->
                                 <div class="component-group">
                                     <h3 class="component-group-title"><?php esc_html_e('Componentes interactivos', 'englishline-test'); ?></h3>
 
-                                    <div class="form-component" data-type="image">
+                                    <div class="form-component" data-type="image" data-gradable="false" data-requires-media="true">
                                         <span class="form-component-icon dashicons dashicons-format-image"></span>
                                         <span class="form-component-label"><?php esc_html_e('Imagen con descripción', 'englishline-test'); ?></span>
                                     </div>
 
-                                    <div class="form-component" data-type="cloze">
+                                    <div class="form-component" data-type="cloze" data-gradable="true" data-special-format="true">
                                         <span class="form-component-icon dashicons dashicons-editor-insertmore"></span>
                                         <span class="form-component-label"><?php esc_html_e('Completar texto', 'englishline-test'); ?></span>
                                     </div>
 
-                                    <div class="form-component" data-type="ordering">
+                                    <div class="form-component" data-type="ordering" data-gradable="true" data-requires-items="true">
                                         <span class="form-component-icon dashicons dashicons-sort"></span>
                                         <span class="form-component-label"><?php esc_html_e('Ordenar elementos', 'englishline-test'); ?></span>
                                     </div>
 
-                                    <div class="form-component" data-type="true-false">
+                                    <div class="form-component" data-type="true-false" data-gradable="true" data-has-feedback="true">
                                         <span class="form-component-icon dashicons dashicons-yes-no"></span>
                                         <span class="form-component-label"><?php esc_html_e('Verdadero/Falso', 'englishline-test'); ?></span>
                                     </div>
@@ -151,7 +140,6 @@ $mode = ($form_id > 0) ? 'edit' : 'new';
                             </div>
                         </div>
 
-                        <!-- Contenedor de secciones del formulario -->
                         <div class="form-sections-container" id="form-sections-container">
                             <div class="form-sections-empty">
                                 <p><?php esc_html_e('Arrastra componentes aquí para construir tu formulario.', 'englishline-test'); ?></p>
@@ -183,7 +171,6 @@ $mode = ($form_id > 0) ? 'edit' : 'new';
                     <?php endif; ?>
                 </div>
 
-                <!-- Columna de vista previa -->
                 <div class="form-builder-column">
                     <div class="form-preview-container" id="form-preview">
                         <div class="form-preview-header">
@@ -198,7 +185,6 @@ $mode = ($form_id > 0) ? 'edit' : 'new';
                         <div class="preview-sections">
                         </div>
 
-                        <!-- Navegación entre secciones -->
                         <div class="preview-nav" style="display: none;">
                             <button class="preview-prev-btn" disabled><?php esc_html_e('Anterior', 'englishline-test'); ?></button>
                             <div class="preview-dots"></div>
@@ -211,67 +197,27 @@ $mode = ($form_id > 0) ? 'edit' : 'new';
     </div>
 </div>
 
-
 <script type="text/javascript">
-
     var formDataFromPHP = <?php
         if ($mode === 'edit' && !empty($form_fields)) {
-            if (substr($form_fields, 0, 1) === '"' && substr($form_fields, -1) === '"') {
-                $form_fields = substr($form_fields, 1, -1);
-            }
-
-            if (strpos($form_fields, '\\\\') !== false) {
-                $form_fields = stripslashes($form_fields);
-            }
-
-            $decoded = json_decode($form_fields, true);
-
-            if (json_last_error() !== JSON_ERROR_NONE) {
-
-                $decoded = json_decode(stripslashes($form_fields), true);
-
-                if (json_last_error() !== JSON_ERROR_NONE) {
-                    $decoded = json_decode(html_entity_decode($form_fields, ENT_QUOTES, 'UTF-8'), true);
-                }
-            }
-
-            function decode_unicode_in_array(&$data) {
-                if (is_array($data)) {
-                    foreach ($data as $key => &$value) {
-                        if (is_array($value)) {
-                            decode_unicode_in_array($value);
-                        } elseif (is_string($value)) {
-                            $value = preg_replace_callback('/u([0-9a-fA-F]{4})/', function ($matches) {
-                                return mb_convert_encoding(pack('H*', $matches[1]), 'UTF-8', 'UCS-2BE');
-                            }, $value);
-                        }
-                    }
-                }
-            }
+            // Hacer log para depuración
+            error_log('EnglishLine - form_fields (primeros 100 caracteres): ' . substr($form_fields, 0, 100));
             
-            if (is_array($decoded)) {
-                decode_unicode_in_array($decoded);
-            }
-
-
-            if (is_array($decoded)) {
-                echo json_encode($decoded);
-                error_log('Editor: JSON procesado correctamente con ' . count($decoded) . ' secciones');
-            } else {
+            // Decodificar directamente sin manipulaciones previas
+            $decoded = json_decode($form_fields, true);
+            
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                error_log('EnglishLine - Error al decodificar JSON: ' . json_last_error_msg());
                 echo '[]';
-                error_log('Editor: No se pudo procesar el JSON, devolviendo array vacío');
+            } else {
+                echo json_encode($decoded);
             }
         } else {
             echo '[]';
         }
     ?>;
     
-    // Verificación de seguridad
     if (typeof formDataFromPHP !== 'object' || formDataFromPHP === null) {
-        console.log('formDataFromPHP no es un objeto válido, inicializando como array vacío');
         formDataFromPHP = [];
-    } else {
-        console.log('formDataFromPHP cargado correctamente con ' + 
-                   (Array.isArray(formDataFromPHP) ? formDataFromPHP.length + ' secciones' : 'propiedades'));
     }
 </script>

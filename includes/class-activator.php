@@ -40,14 +40,14 @@ class EnglishLine_Test_Activator {
         $charset_collate = $wpdb->get_charset_collate();
         
         // Tabla para almacenar los formularios
-        $table_name_forms = $wpdb->prefix . 'englishline_forms';
+         $table_name_forms = $wpdb->prefix . 'englishline_forms';
         $sql_forms = "CREATE TABLE $table_name_forms (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
             title varchar(255) NOT NULL,
             description text NULL,
             form_data longtext NOT NULL,
-            form_style longtext NULL,
             shortcode varchar(100) NOT NULL,
+            status varchar(50) DEFAULT 'published' NOT NULL,
             created_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
             PRIMARY KEY  (id)
@@ -62,6 +62,7 @@ class EnglishLine_Test_Activator {
             user_email varchar(100) NULL,
             form_data longtext NOT NULL,
             score float NULL,
+            level varchar(5) NULL,
             feedback text NULL,
             individual_scores longtext NULL,
             status varchar(50) DEFAULT 'pending' NOT NULL,

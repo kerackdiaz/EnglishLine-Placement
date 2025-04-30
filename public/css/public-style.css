@@ -99,19 +99,150 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-.englishline-section-title {
-  font-size: 22px;
+/* ===== MEJORAS PARA TÍTULOS Y PÁRRAFOS ===== */
+.form-question-text {
+  font-size: 18px;
+  line-height: 1.5;
   color: #333;
   margin-bottom: 15px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 10px 0;
+  width: 100%;
 }
 
-.englishline-section-description {
-  color: #666;
-  margin-bottom: 25px;
-  font-size: 15px;
+/* Mejora de tamaños de título */
+.form-question-text.size-h1 { 
+  font-size: 28px; 
+  font-weight: 700;
+  margin-bottom: 20px;
+  line-height: 1.3;
+  color: #1a1a1a;
+}
+
+.form-question-text.size-h2 { 
+  font-size: 24px; 
+  font-weight: 600;
+  margin-bottom: 18px; 
+  line-height: 1.35;
+  color: #222222;
+}
+
+.form-question-text.size-h3 { 
+  font-size: 20px; 
+  font-weight: 600;
+  margin-bottom: 15px;
+  line-height: 1.4;
+  color: #333333;
+}
+
+.form-question-text.size-p { 
+  font-size: 16px; 
+  font-weight: normal;
+  line-height: 1.6; 
+}
+
+/* Mejoras de alineación con efectos visuales */
+.form-question-text.align-left { 
+  text-align: left; 
+  border-left: 3px solid #e0e0e0;
+  padding-left: 15px;
+}
+
+.form-question-text.align-center { 
+  text-align: center;
+  position: relative;
+}
+
+.form-question-text.align-center:after {
+  content: '';
+  display: block;
+  width: 60px;
+  height: 3px;
+  background: #3498db;
+  margin: 15px auto 0;
+  border-radius: 3px;
+}
+
+.form-question-text.align-right { 
+  text-align: right;
+  border-right: 3px solid #e0e0e0;
+  padding-right: 15px; 
+}
+
+.form-question-text.align-justify { 
+  text-align: justify; 
+}
+
+/* Estilos específicos para párrafos */
+.englishline-question[data-question-type="paragraph"] .form-question-text {
+  padding: 5px 0;
+  text-indent: 20px;
+}
+
+/* ===== SECCIÓN DE EXPLICACIONES ===== */
+.form-question-explanation-container {
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px dashed #e0e0e0;
+}
+
+.question-explanation-toggle {
+  display: inline-block;
+  color: #3498db;
+  padding: 6px 12px;
+  background-color: rgba(52, 152, 219, 0.1);
+  border-radius: 4px;
+  font-size: 14px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.question-explanation-toggle:hover {
+  background-color: rgba(52, 152, 219, 0.2);
+  color: #2980b9;
+}
+
+.question-explanation-toggle:before {
+  content: "\f140";
+  font-family: dashicons;
+  vertical-align: middle;
+  margin-right: 5px;
+}
+
+.question-explanation-toggle.active:before {
+  content: "\f142";
+}
+
+.question-explanation-content {
+  margin-top: 12px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-left: 3px solid #3498db;
+  border-radius: 5px;
+  font-size: 14px;
   line-height: 1.5;
+  color: #555;
+  animation: fadeDown 0.4s ease-in-out;
+}
+
+@keyframes fadeDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.question-explanation-content p:first-child {
+  margin-top: 0;
+}
+
+.question-explanation-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* Mejora para dispositivos móviles */
+@media (max-width: 768px) {
+  .form-question-text.size-h1 { font-size: 24px; }
+  .form-question-text.size-h2 { font-size: 20px; }
+  .form-question-text.size-h3 { font-size: 18px; }
 }
 
 /* ===== PREGUNTAS ===== */
@@ -203,10 +334,105 @@
   padding-left: 5px;
 }
 
-/* ===== VERDADERO/FALSO ===== */
+/* ===== ESTILOS MEJORADOS PARA VERDADERO/FALSO ===== */
+.form-question-true-false .true-false-statement {
+    margin-bottom: 15px;
+    font-weight: 500;
+}
+
 .form-question-true-false .true-false-options {
-  display: flex;
-  gap: 20px;
+    display: flex;
+    gap: 15px;
+    margin-top: 12px;
+}
+
+.true-false-option {
+    position: relative;
+    width: 100%;
+    max-width: 160px;
+}
+
+.true-false-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.true-false-option label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 12px 20px;
+    border-radius: 6px;
+    background-color: #f5f5f5;
+    border: 2px solid #e0e0e0;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+/* Estilo para hover */
+.true-false-option:hover label {
+    border-color: #bbb;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+}
+
+/* Estilo para verdadero */
+.true-false-option input[value="true"] + label {
+    color: #2c7d3e;
+}
+
+.true-false-option input[value="true"]:checked + label {
+    background-color: #e8f5e9;
+    border-color: #2ecc71;
+    box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.2);
+}
+
+.true-false-option input[value="true"]:checked + label:before {
+    content: "\f147"; /* Dashicons checkmark */
+    font-family: dashicons;
+    margin-right: 5px;
+    font-size: 18px;
+    vertical-align: -4px;
+}
+
+/* Estilo para falso */
+.true-false-option input[value="false"] + label {
+    color: #c0392b;
+}
+
+.true-false-option input[value="false"]:checked + label {
+    background-color: #ffebee;
+    border-color: #e74c3c;
+    box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.2);
+}
+
+.true-false-option input[value="false"]:checked + label:before {
+    content: "\f335"; /* Dashicons cross */
+    font-family: dashicons;
+    margin-right: 5px;
+    font-size: 18px;
+    vertical-align: -4px;
+}
+
+/* Efecto pulsación */
+.true-false-option input:active + label {
+    transform: scale(0.97);
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .form-question-true-false .true-false-options {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .true-false-option {
+        max-width: 100%;
+    }
 }
 
 /* ===== EJERCICIO CLOZE ===== */

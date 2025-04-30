@@ -110,7 +110,7 @@ if (isset($_GET['status']) && isset($_GET['form_id'])) {
 
                             $submissions_count = 0;
                             if ($table_exists) {
-                                $submissions_table = $wpdb->prefix . 'englishline_submissions';
+                                $submissions_table = $wpdb->prefix . 'englishline_results';
                                 $submissions_count = $wpdb->get_var($wpdb->prepare(
                                     "SELECT COUNT(*) FROM {$submissions_table} WHERE form_id = %d",
                                     $form['id']
