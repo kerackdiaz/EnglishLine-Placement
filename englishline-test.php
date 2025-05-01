@@ -3,7 +3,7 @@
  * Plugin Name: EnglishLine Placement
  * Plugin URI: https://github.com/kerackdiaz/EnglishLine-Placement
  * Description: Un plugin para crear tests de inglés con formularios personalizables paso a paso.
- * Version: 1.5.6
+ * Version: 2.2.7
  * Author: KerackDiaz
  * Author URI: https://github.com/kerackdiaz/
  * Text Domain: englishline-test
@@ -18,7 +18,7 @@ if (!defined('WPINC')) {
 }
 
 // Definir constantes
-define('ENGLISHLINETEST_VERSION', '1.5.6');
+define('ENGLISHLINETEST_VERSION', '2.2.7');
 define('ENGLISHLINETEST_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('ENGLISHLINETEST_PLUGIN_URL', plugin_dir_url(__FILE__));
 
