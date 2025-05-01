@@ -29,56 +29,55 @@ class EnglishLine_Test {
      * Define la funcionalidad principal del plugin.
      */
     public function __construct() {
-        if (defined('ENGLISHLINE_TEST_VERSION')) {
-            $this->version = ENGLISHLINE_TEST_VERSION;
-        } else {
-            $this->version = '1.0.0';
-        }
+        $this->version = ENGLISHLINETEST_VERSION;
         $this->plugin_name = 'englishline-test';
 
         $this->load_dependencies();
         $this->set_locale();
         $this->define_admin_hooks();
         $this->define_public_hooks();
+        $this->initialize_github_updater();
     }
 
     /**
      * Carga las dependencias requeridas para este plugin.
      */
     private function load_dependencies() {
-
         /**
-         * La clase responsable de orquestar las acciones y filtros del
-         * núcleo del plugin.
+         * La clase responsable de orquestar las acciones y filtros del núcleo del plugin.
          */
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-loader.php';
 
         /**
-         * La clase responsable de definir la funcionalidad de internacionalización
-         * del plugin.
+         * La clase responsable de definir la funcionalidad de internacionalización del plugin.
          */
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-i18n.php';
 
         /**
-         * La clase responsable de definir toda la funcionalidad del área de administración
+         * La clase responsable de definir toda la funcionalidad del área de administración.
          */
         require_once plugin_dir_path(dirname(__FILE__)) . 'admin/class-admin.php';
-        
+
         /**
-         * La clase responsable de manejar las peticiones Ajax en el admin
+         * La clase responsable de manejar las peticiones Ajax en el admin.
          */
         require_once plugin_dir_path(dirname(__FILE__)) . 'admin/class-ajax-handler.php';
 
         /**
-         * La clase responsable de definir toda la funcionalidad del área pública
+         * La clase responsable de definir toda la funcionalidad del área pública.
          */
         require_once plugin_dir_path(dirname(__FILE__)) . 'public/class-public.php';
 
+
         /**
-         * Funciones relacionadas con la configuración del plugin
+         * Funciones relacionadas con la configuración del plugin.
          */
         require_once plugin_dir_path(__FILE__) . 'settings-functions.php';
-        
+
+        /**
+         * La clase responsable de manejar las actualizaciones desde GitHub.
+         */
+        require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-wp-github-updater.php';
 
         $this->loader = new EnglishLine_Test_Loader();
     }
@@ -89,6 +88,27 @@ class EnglishLine_Test {
     private function set_locale() {
         $plugin_i18n = new EnglishLine_Test_i18n();
         $this->loader->add_action('plugins_loaded', $plugin_i18n, 'load_plugin_textdomain');
+    }
+
+    /**
+     * Inicializa el actualizador desde GitHub.
+     */
+    private function initialize_github_updater() {
+        $updater_config = array(
+            'slug' => 'englishline-test/englishline-test.php',
+            'proper_folder_name' => 'englishline-test',
+            'api_url' => 'https://api.github.com/repos/kerackdiaz/EnglishLine-Placement',
+            'raw_url' => 'https://raw.githubusercontent.com/kerackdiaz/EnglishLine-Placement/master',
+            'github_url' => 'https://github.com/kerackdiaz/EnglishLine-Placement',
+            'zip_url' => 'https://github.com/kerackdiaz/EnglishLine-Placement/archive/master.zip',
+            'requires' => '5.6', // Minimum WordPress version required
+            'tested' => '6.4',  // Tested up to WordPress version
+            'readme' => 'README.md',
+            'access_token' => '', // Optional: Add a GitHub access token if the repo is private
+            'sslverify' => true,
+        );
+
+        new WP_GitHub_Updater($updater_config);
     }
 
     /**
@@ -118,8 +138,6 @@ class EnglishLine_Test {
         $this->loader->add_action('wp_ajax_englishline_toggle_form_status', $plugin_ajax, 'toggle_form_status');
         $this->loader->add_action('wp_ajax_englishline_save_email_template', $plugin_ajax, 'save_email_template');
         $this->loader->add_action('wp_ajax_englishline_save_result', $plugin_ajax, 'save_result');
-        $this->loader->add_action('wp_ajax_englishline_check_github_updates', $plugin_ajax, 'check_github_updates');
-        $this->loader->add_action('wp_ajax_englishline_update_from_github', $plugin_ajax, 'update_from_github');
         $this->loader->add_action('wp_ajax_englishline_export_settings', $plugin_ajax, 'export_settings');
         $this->loader->add_action('wp_ajax_englishline_import_settings', $plugin_ajax, 'import_settings');
     }

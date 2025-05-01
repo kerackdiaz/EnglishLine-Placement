@@ -19,7 +19,6 @@
 - **Calificación automática y manual:** Califica respuestas objetivas automáticamente y permite revisión manual de preguntas abiertas.
 - **Envío de resultados por email:** Notifica automáticamente a los participantes sobre sus calificaciones.
 - **Panel de administración intuitivo:** Gestiona fácilmente todos tus exámenes desde un solo lugar.
-- **Actualización desde GitHub:** Verifica y aplica actualizaciones directamente desde el repositorio de GitHub.
 
 ## Primeros pasos
 
@@ -49,19 +48,6 @@
 2. Personaliza las plantillas de correo para notificaciones.
 3. Configura el remitente y los destinatarios de las notificaciones.
 
-### Actualización del Plugin desde GitHub
-El plugin ahora incluye una funcionalidad mejorada para verificar y aplicar actualizaciones directamente desde GitHub. Sigue estos pasos para actualizar:
-
-1. Ve a **"EnglishLine Placement > Configuración > Actualizaciones"**.
-2. Haz clic en **"Verificar actualizaciones"** para comprobar si hay una nueva versión disponible en el repositorio de GitHub (`kerackdiaz/EnglishLine-Placement`).
-3. Si hay una actualización disponible, haz clic en **"Actualizar ahora"**.
-4. El plugin descargará la nueva versión, reemplazará los archivos existentes y se reactivará automáticamente si estaba activo.
-
-#### Notas sobre la Actualización
-- **Mejoras Recientes:** Se corrigió un problema donde los archivos del plugin no se reemplazaban correctamente, lo que resultaba en la creación de un directorio duplicado. Ahora los archivos se actualizan directamente en el directorio del plugin (`wp-content/plugins/englishline-test`).
-- **Permisos:** Asegúrate de que el directorio de plugins (`wp-content/plugins`) tenga permisos de escritura para que el proceso de actualización funcione correctamente.
-- **Depuración:** Si hay un error durante la actualización, revisa el mensaje de error y el `debug_info` proporcionado para obtener más detalles.
-
 ## Desinstalación
 El plugin incluye una opción para eliminar todos los datos cuando se desinstala:
 
@@ -79,11 +65,6 @@ Sí, puedes asignar calificaciones específicas para cada pregunta durante la re
 
 **¿Es posible limitar el tiempo de los exámenes?**  
 Sí, puedes establecer un tiempo límite para cada formulario en la configuración del mismo.
-
-**¿Qué hago si la actualización desde GitHub falla?**  
-- Verifica los permisos del directorio `wp-content/plugins`.
-- Habilita el modo de depuración en WordPress (`WP_DEBUG`, `WP_DEBUG_LOG`) y revisa el archivo `wp-content/debug.log` para más detalles.
-- Contacta al soporte con el mensaje de error y el `debug_info` proporcionado.
 
 ## Soporte
 Si necesitas ayuda con el plugin, puedes:

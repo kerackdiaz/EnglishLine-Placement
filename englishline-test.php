@@ -3,11 +3,13 @@
  * Plugin Name: EnglishLine Placement
  * Plugin URI: https://github.com/kerackdiaz/EnglishLine-Placement
  * Description: Un plugin para crear tests de inglés con formularios personalizables paso a paso.
- * Version: 2.2.6
+ * Version: 1.5.6
  * Author: KerackDiaz
  * Author URI: https://github.com/kerackdiaz/
- * Text Domain: englishline-placement
+ * Text Domain: englishline-test
  * Domain Path: /languages
+ * License: GPL-2.0+
+ * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
  */
 
 // Si este archivo es llamado directamente, aborta.
@@ -16,15 +18,15 @@ if (!defined('WPINC')) {
 }
 
 // Definir constantes
-define('ENGLISHLINE_TEST_VERSION', '2.2.6');
-define('ENGLISHLINE_TEST_PLUGIN_DIR', plugin_dir_path(__FILE__));
-define('ENGLISHLINE_TEST_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('ENGLISHLINETEST_VERSION', '1.5.6');
+define('ENGLISHLINETEST_PLUGIN_DIR', plugin_dir_path(__FILE__));
+define('ENGLISHLINETEST_PLUGIN_URL', plugin_dir_url(__FILE__));
 
 /**
  * Código que se ejecuta durante la activación del plugin.
  */
 function activate_englishline_test() {
-    require_once ENGLISHLINE_TEST_PLUGIN_DIR . 'includes/class-activator.php';
+    require_once ENGLISHLINETEST_PLUGIN_DIR . 'includes/class-activator.php';
     EnglishLine_Test_Activator::activate();
 }
 
@@ -32,7 +34,7 @@ function activate_englishline_test() {
  * Código que se ejecuta durante la desactivación del plugin.
  */
 function deactivate_englishline_test() {
-    require_once ENGLISHLINE_TEST_PLUGIN_DIR . 'includes/class-deactivator.php';
+    require_once ENGLISHLINETEST_PLUGIN_DIR . 'includes/class-deactivator.php';
     EnglishLine_Test_Deactivator::deactivate();
 }
 
@@ -42,7 +44,7 @@ register_deactivation_hook(__FILE__, 'deactivate_englishline_test');
 /**
  * Incluye la clase principal del plugin.
  */
-require_once ENGLISHLINE_TEST_PLUGIN_DIR . 'includes/class-englishline-test.php';
+require_once ENGLISHLINETEST_PLUGIN_DIR . 'includes/class-englishline-test.php';
 
 /**
  * Comienza la ejecución del plugin.
@@ -52,4 +54,6 @@ function run_englishline_test() {
     $plugin->run();
 }
 
-run_englishline_test();
+define( 'WP_GITHUB_FORCE_UPDATE', true );
+
+add_action('plugins_loaded', 'run_englishline_test');

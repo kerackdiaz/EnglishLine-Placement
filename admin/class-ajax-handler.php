@@ -29,7 +29,7 @@ class EnglishLine_Test_Ajax_Handler
         return true;
     }
 
-    private function copy_directory($src, $dst)
+    private function copy_directory($src, $dst, $overwrite = true)
     {
         global $wp_filesystem;
 
@@ -53,9 +53,11 @@ class EnglishLine_Test_Ajax_Handler
             $dst_file = $dst . '/' . $file;
 
             if ($fileinfo['type'] === 'd') {
-                $this->copy_directory($src_file, $dst_file);
+                $this->copy_directory($src_file, $dst_file, $overwrite);
             } else {
-                $wp_filesystem->copy($src_file, $dst_file);
+                if ($overwrite || !$wp_filesystem->exists($dst_file)) {
+                    $wp_filesystem->copy($src_file, $dst_file);
+                }
             }
         }
 
@@ -488,242 +490,7 @@ class EnglishLine_Test_Ajax_Handler
         return $mail_sent;
     }
 
-    public function check_github_updates()
-    {
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'englishline_check_updates')) {
-            wp_send_json_error(array('message' => 'Error de seguridad. Por favor, recarga la página.'));
-        }
 
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => 'No tienes permiso para verificar actualizaciones.'));
-        }
-
-        $github_repo = 'kerackdiaz/EnglishLine-Placement';
-        $current_version = $this->version;
-
-        if (empty($current_version)) {
-            wp_send_json_error(array('message' => 'La versión actual del plugin no está definida.'));
-            return;
-        }
-
-        $github_token = ''; // Define tu token de acceso personal aquí
-        $headers = array();
-        if (!empty($github_token)) {
-            $headers['Authorization'] = 'token ' . $github_token;
-        }
-
-        $response = wp_remote_get(
-            "https://api.github.com/repos/{$github_repo}/releases/latest",
-            array(
-                'headers' => $headers,
-                'timeout' => 15
-            )
-        );
-
-        if (is_wp_error($response)) {
-            wp_send_json_error(array(
-                'message' => 'Error al conectar con GitHub: ' . $response->get_error_message()
-            ));
-            return;
-        }
-
-        $response_code = wp_remote_retrieve_response_code($response);
-        if ($response_code !== 200) {
-            wp_send_json_error(array(
-                'message' => 'Error al obtener la última versión de GitHub. Código de respuesta: ' . $response_code
-            ));
-            return;
-        }
-
-        $body = wp_remote_retrieve_body($response);
-        $release_info = json_decode($body);
-
-        if (!$release_info || !isset($release_info->tag_name)) {
-            wp_send_json_error(array(
-                'message' => 'No se pudo obtener información de la última versión. Respuesta inválida de GitHub.'
-            ));
-            return;
-        }
-
-        $latest_version = preg_replace('/^[vV]/', '', $release_info->tag_name);
-        $update_available = version_compare($latest_version, $current_version, '>');
-
-        wp_send_json_success(array(
-            'current_version' => $current_version,
-            'latest_version' => $latest_version,
-            'update_available' => $update_available,
-            'release_notes' => isset($release_info->body) ? $release_info->body : '',
-            'download_url' => isset($release_info->zipball_url) ? $release_info->zipball_url : '',
-        ));
-    }
-
-    public function update_from_github()
-    {
-        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'englishline_update_plugin')) {
-            wp_send_json_error(array('message' => 'Error de seguridad. Por favor, recarga la página.'));
-        }
-
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => 'No tienes permiso para actualizar el plugin.'));
-        }
-
-        $download_url = isset($_POST['download_url']) ? esc_url_raw($_POST['download_url']) : '';
-
-        if (empty($download_url)) {
-            wp_send_json_error(array('message' => 'URL de descarga no proporcionada.'));
-            return;
-        }
-
-        require_once(ABSPATH . 'wp-admin/includes/file.php');
-        require_once(ABSPATH . 'wp-admin/includes/plugin.php');
-        require_once(ABSPATH . 'wp-admin/includes/class-wp-upgrader.php');
-        require_once(ABSPATH . 'wp-admin/includes/misc.php');
-
-        global $wp_filesystem;
-        if (empty($wp_filesystem)) {
-            WP_Filesystem();
-        }
-
-        if (!$wp_filesystem->is_writable(WP_PLUGIN_DIR)) {
-            wp_send_json_error(array('message' => 'El directorio de plugins no es escribible. Verifica los permisos.'));
-            return;
-        }
-
-        set_time_limit(300);
-        @ini_set('memory_limit', '256M');
-
-        $free_space = disk_free_space(WP_CONTENT_DIR);
-        if ($free_space === false || $free_space < 50 * 1024 * 1024) {
-            wp_send_json_error(array('message' => 'Espacio en disco insuficiente para realizar la actualización.'));
-            return;
-        }
-
-        ob_start();
-
-        $plugin_slug = 'englishline-test';
-        $plugin_file = $plugin_slug . '/' . $plugin_slug . '.php';
-        $plugin_dir = WP_PLUGIN_DIR . '/' . $plugin_slug;
-
-        try {
-            $was_active = is_plugin_active($plugin_file);
-            if ($was_active) {
-                deactivate_plugins($plugin_file);
-            }
-
-            // Descargar el archivo
-            $temp_file = download_url($download_url, 300);
-            if (is_wp_error($temp_file)) {
-                throw new Exception('Error al descargar el archivo: ' . $temp_file->get_error_message());
-            }
-
-            // Crear directorio temporal
-            $temp_dir = WP_CONTENT_DIR . '/upgrade/englishline-temp-' . time();
-            if (!$wp_filesystem->mkdir($temp_dir, 0755)) {
-                throw new Exception('No se pudo crear el directorio temporal: ' . $temp_dir);
-            }
-
-            // Descomprimir el archivo
-            $unzipped = unzip_file($temp_file, $temp_dir);
-            $wp_filesystem->delete($temp_file);
-
-            if (is_wp_error($unzipped)) {
-                if (class_exists('ZipArchive')) {
-                    $zip = new ZipArchive();
-                    if ($zip->open($temp_file) === true) {
-                        $zip->extractTo($temp_dir);
-                        $zip->close();
-                    } else {
-                        throw new Exception('Error al extraer el archivo (ZipArchive): No se pudo abrir el archivo ZIP.');
-                    }
-                } else {
-                    throw new Exception('Error al extraer el archivo: ' . $unzipped->get_error_message());
-                }
-            }
-
-            // Buscar el directorio extraído
-            $extracted_dir = '';
-            $items = $wp_filesystem->dirlist($temp_dir);
-            if ($items) {
-                foreach ($items as $item => $data) {
-                    if ($data['type'] === 'd' && strpos($item, 'EnglishLine-Placement') !== false) {
-                        $extracted_dir = $temp_dir . '/' . $item;
-                        break;
-                    }
-                }
-            }
-
-            if (empty($extracted_dir) || !$wp_filesystem->exists($extracted_dir)) {
-                throw new Exception('No se pudo encontrar el directorio extraído en: ' . $temp_dir);
-            }
-
-            // Limpiar el directorio del plugin existente
-            if ($wp_filesystem->exists($plugin_dir)) {
-                if (!$this->clear_directory($plugin_dir)) {
-                    throw new Exception('No se pudo limpiar el directorio del plugin existente: ' . $plugin_dir);
-                }
-            }
-            if (!$wp_filesystem->mkdir($plugin_dir, 0755)) {
-                throw new Exception('No se pudo crear el directorio del plugin: ' . $plugin_dir);
-            }
-
-            // Copiar los archivos del directorio extraído directamente al directorio del plugin
-            $files = $wp_filesystem->dirlist($extracted_dir);
-            if ($files === false) {
-                throw new Exception('No se pudo leer el contenido del directorio extraído: ' . $extracted_dir);
-            }
-
-            foreach ($files as $file => $fileinfo) {
-                $src_file = $extracted_dir . '/' . $file;
-                $dst_file = $plugin_dir . '/' . $file;
-
-                if ($fileinfo['type'] === 'd') {
-                    $this->copy_directory($src_file, $dst_file);
-                } else {
-                    $wp_filesystem->copy($src_file, $dst_file);
-                }
-            }
-
-            // Limpiar el directorio temporal
-            $this->remove_directory($temp_dir);
-
-            // Verificar que el archivo principal del plugin exista
-            if (!$wp_filesystem->exists(WP_PLUGIN_DIR . '/' . $plugin_file)) {
-                throw new Exception('El archivo principal del plugin no se encontró después de la actualización: ' . $plugin_file);
-            }
-
-            // Reactivar el plugin si estaba activo
-            if ($was_active) {
-                $activate_result = activate_plugin($plugin_file);
-                if (is_wp_error($activate_result)) {
-                    throw new Exception('Plugin actualizado pero error al reactivar: ' . $activate_result->get_error_message());
-                }
-            }
-
-            $debug_info = ob_get_clean();
-
-            wp_send_json_success(array(
-                'message' => 'El plugin se ha actualizado correctamente' . ($was_active ? ' y reactivado' : ''),
-                'debug_info' => $debug_info
-            ));
-        } catch (Exception $e) {
-            $debug_info = ob_get_clean();
-
-            // Limpiar el directorio temporal en caso de error
-            if (isset($temp_dir) && $wp_filesystem->exists($temp_dir)) {
-                $this->remove_directory($temp_dir);
-            }
-
-            // Reactivar el plugin si estaba activo y aún existe
-            if (isset($was_active) && $was_active && $wp_filesystem->exists(WP_PLUGIN_DIR . '/' . $plugin_file)) {
-                activate_plugin($plugin_file);
-            }
-
-            wp_send_json_error(array(
-                'message' => 'Error: ' . $e->getMessage(),
-                'debug_info' => $debug_info
-            ));
-        }
-    }
 
     public function handle_export_data()
     {
