@@ -29,52 +29,6 @@ class EnglishLine_Test_Ajax_Handler
         return true;
     }
 
-    private function copy_directory($src, $dst, $overwrite = true)
-    {
-        global $wp_filesystem;
-
-        if (!$wp_filesystem->is_dir($src)) {
-            return false;
-        }
-
-        if (!$wp_filesystem->is_dir($dst)) {
-            if (!$wp_filesystem->mkdir($dst, 0755)) {
-                return false;
-            }
-        }
-
-        $files = $wp_filesystem->dirlist($src);
-        if ($files === false) {
-            return false;
-        }
-
-        foreach ($files as $file => $fileinfo) {
-            $src_file = $src . '/' . $file;
-            $dst_file = $dst . '/' . $file;
-
-            if ($fileinfo['type'] === 'd') {
-                $this->copy_directory($src_file, $dst_file, $overwrite);
-            } else {
-                if ($overwrite || !$wp_filesystem->exists($dst_file)) {
-                    $wp_filesystem->copy($src_file, $dst_file);
-                }
-            }
-        }
-
-        return true;
-    }
-
-    private function remove_directory($dir)
-    {
-        global $wp_filesystem;
-
-        if (!$wp_filesystem->is_dir($dir)) {
-            return;
-        }
-
-        $this->clear_directory($dir);
-        $wp_filesystem->rmdir($dir);
-    }
 
     private $plugin_name;
     private $version;
@@ -104,7 +58,6 @@ class EnglishLine_Test_Ajax_Handler
         $title = isset($_POST['title']) ? sanitize_text_field($_POST['title']) : '';
         $description = isset($_POST['description']) ? sanitize_textarea_field($_POST['description']) : '';
         $form_data = isset($_POST['form_data']) ? wp_unslash($_POST['form_data']) : '';
-        $form_style = isset($_POST['form_style']) ? json_encode($_POST['form_style']) : '';
         $form_id = isset($_POST['form_id']) ? intval($_POST['form_id']) : 0;
 
         if (empty($title)) {
@@ -121,7 +74,6 @@ class EnglishLine_Test_Ajax_Handler
                     'title' => $title,
                     'description' => $description,
                     'form_data' => $form_data,
-                    'form_style' => $form_style,
                 ),
                 array('id' => $form_id),
                 array('%s', '%s', '%s', '%s'),
@@ -145,7 +97,6 @@ class EnglishLine_Test_Ajax_Handler
                     'title' => $title,
                     'description' => $description,
                     'form_data' => $form_data,
-                    'form_style' => $form_style,
                     'shortcode' => $shortcode,
                 ),
                 array('%s', '%s', '%s', '%s', '%s')
@@ -490,6 +441,45 @@ class EnglishLine_Test_Ajax_Handler
         return $mail_sent;
     }
 
+    public function check_github_updates()
+    {
+        // Verificar nonce y permisos
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'englishline_check_updates')) {
+            wp_send_json_error(array('message' => __('Error de seguridad. Por favor, recarga la página.', 'englishline-test')));
+        }
+    
+        if (!current_user_can('update_plugins')) {
+            wp_send_json_error(array('message' => __('No tienes permiso para comprobar actualizaciones.', 'englishline-test')));
+        }
+    
+        // Forzar a WordPress a verificar actualizaciones
+        wp_update_plugins();
+        
+        // Obtener información de actualizaciones disponibles
+        $update_data = get_site_transient('update_plugins');
+        
+        $plugin_file = 'englishline-test/englishline-test.php';
+        $has_update = false;
+        $current_version = $this->version;
+        $new_version = '';
+        
+        if (isset($update_data->response[$plugin_file])) {
+            // Hay una actualización disponible
+            $has_update = true;
+            $new_version = $update_data->response[$plugin_file]->new_version;
+        }
+        
+        // Retornar el resultado
+        wp_send_json_success(array(
+            'has_update' => $has_update,
+            'current_version' => $current_version,
+            'new_version' => $new_version,
+            'last_checked' => date_i18n(get_option('date_format') . ' ' . get_option('time_format')),
+            'message' => $has_update 
+                ? sprintf(__('¡Hay una actualización disponible (v%s)! Ve a Plugins para actualizar.', 'englishline-test'), $new_version) 
+                : __('Tu plugin está actualizado.', 'englishline-test')
+        ));
+    }
 
 
     public function handle_export_data()
@@ -626,7 +616,6 @@ class EnglishLine_Test_Ajax_Handler
                     $description = isset($form['description']) ? sanitize_textarea_field($form['description']) : '';
                     $shortcode = isset($form['shortcode']) ? sanitize_text_field($form['shortcode']) : '';
                     $form_data = isset($form['form_data']) ? $form['form_data'] : '';
-                    $form_style = isset($form['form_style']) ? $form['form_style'] : '';
 
                     $is_duplicate_shortcode = in_array($shortcode, $existing_shortcodes);
                     $is_duplicate_title = in_array($title, $existing_titles);
@@ -639,7 +628,7 @@ class EnglishLine_Test_Ajax_Handler
                                     'title' => $title,
                                     'description' => $description,
                                     'form_data' => $form_data,
-                                    'form_style' => $form_style,
+
                                     'updated_at' => current_time('mysql')
                                 ),
                                 array('shortcode' => $shortcode),
@@ -661,7 +650,6 @@ class EnglishLine_Test_Ajax_Handler
                                     'title' => $new_title,
                                     'description' => $description,
                                     'form_data' => $form_data,
-                                    'form_style' => $form_style,
                                     'shortcode' => $new_shortcode,
                                     'created_at' => current_time('mysql'),
                                     'updated_at' => current_time('mysql')
@@ -686,7 +674,6 @@ class EnglishLine_Test_Ajax_Handler
                                 'title' => $title,
                                 'description' => $description,
                                 'form_data' => $form_data,
-                                'form_style' => $form_style,
                                 'shortcode' => $shortcode,
                                 'created_at' => isset($form['created_at']) ? $form['created_at'] : current_time('mysql'),
                                 'updated_at' => current_time('mysql')
@@ -779,30 +766,7 @@ class EnglishLine_Test_Ajax_Handler
             }
         }
 
-        if (isset($import_data['submissions']) && is_array($import_data['submissions']) && $duplicate_mode === 'full_import') {
-            $submissions_table = $wpdb->prefix . 'englishline_submissions';
-
-            if ($wpdb->get_var("SHOW TABLES LIKE '$submissions_table'") == $submissions_table) {
-                foreach ($import_data['submissions'] as $submission) {
-                    unset($submission['id']);
-
-                    $columns = array();
-                    $formats = array();
-
-                    foreach ($submission as $key => $value) {
-                        $columns[$key] = $value;
-                        $formats[] = is_numeric($value) ? '%d' : '%s';
-                    }
-
-                    $result = $wpdb->insert($submissions_table, $columns, $formats);
-
-                    if ($result) {
-                        $stats['submissions_imported']++;
-                    }
-                }
-            }
-        }
-
+       
         wp_send_json_success(array(
             'message' => 'Importación completada correctamente.',
             'stats' => $stats,

@@ -125,11 +125,11 @@ function englishline_test_initialize_settings() {
  * Registra las opciones de configuración con WordPress
  */
 function englishline_test_register_settings() {
-    // Registrar configuración correctamente
+
     register_setting(
-        'englishline_test_options', // Grupo de opciones (usado en settings_fields)
-        'englishline_test_settings', // Nombre de la opción en la base de datos
-        'englishline_test_sanitize_settings' // Callback de sanitización
+        'englishline_test_options', 
+        'englishline_test_settings', 
+        'englishline_test_sanitize_settings'
     );
 }
 

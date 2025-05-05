@@ -887,7 +887,7 @@
           description: formDescription,
           form_id: formId,
           form_data: JSON.stringify(this.sectionsData),
-          status: 'publish'
+          status: 'publish',
         },
         success: function (response) {
           if (response.success) {
